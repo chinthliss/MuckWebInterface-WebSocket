@@ -5,8 +5,15 @@
   "author": "Chinthliss",
   "license": "ISC",
   "type": "module",
-  "main": "dist/muckwebinterface-websocket.ts",
-  "module": "src/index.ts",
+  "main": "dist/muckwebinterface-websocket.umd.cjs",
+  "module": "dist/muckwebinterface-websocket.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/muckwebinterface-websocket.js",
+      "require": "./dist/muckwebinterface-websocket.umd.cjs"
+    }
+  },
   "scripts": {
     "test": "vitest",
     "dev": "vite",
