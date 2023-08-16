@@ -1,3 +1,5 @@
+import {Connection} from "./connection";
+
 enum ConnectionStates {
     disconnected = 'disconnected', // Only used before startup
     connecting = 'connecting',
@@ -15,6 +17,11 @@ const msgRegExp: RegExp = /MSG(.*?),(.*?),(.*)/;
  */
 const sysRegExp: RegExp = /SYS(.*?),(.*?),(.*)/;
 
+export interface coreOptions {
+    environment?: string;
+    websocketUrl?: string;
+    authenticationUrl?: string;
+}
 export default class Core {
 
     environment: string = "production";
@@ -35,9 +42,25 @@ export default class Core {
 
     debug: boolean = false;
 
-    //connection
+    connection: Connection | null = null;
 
     //channels
+
+    /**
+     * Utility function to format errors
+     * @param {string} message
+     */
+    logError(message: string): void {
+        console.log("Mwi-Websocket ERROR: " + message);
+    }
+
+    /**
+     * Utility function to format debug lines and omit if disabled
+     * @param {string} message
+     */
+    logDebug(message: string): void {
+        if (this.debug) console.log("Mwi-Websocket DEBUG: " + message);
+    }
 
     /**
      * Enables or disables printing debug information into the console
@@ -60,19 +83,13 @@ export default class Core {
     }
 
     /**
-     * Utility function to format errors
-     * @param {string} message
+     *
+     * @param {coreOptions} options
      */
-    logError(message: string): void {
-        console.log("Mwi-Websocket ERROR: " + message);
-    }
+    init(options:coreOptions):void {
+        this.environment = options?.environment || import.meta.env.MODE || "production";
+        if (options.environment) this.environment = options.environment;
 
-    /**
-     * Utility function to format debug lines and omit if disabled
-     * @param {string} message
-     */
-    logDebug(message: string): void {
-        if (this.debug) console.log("Mwi-Websocket DEBUG: " + message);
     }
 
 }
