@@ -1,8 +1,13 @@
 import Core from './core.js';
+import ChannelInterface from "./channel-interface";
 
-interface ChannelInterface {
-    name: string;
-}
+export type MessageHandlerFunction = (
+    (data: any) => void
+    )
+
+export type MonitorHandlerFunction = (
+    (message: string, data: any, outgoing: boolean) => void
+    )
 
 export default class Channel {
 
@@ -10,25 +15,25 @@ export default class Channel {
      * This channel's name
      * @type {string}
      */
-    public readonly name:string;
+    public readonly name: string;
 
     /**
      * Link back to the core for communication
      * @type {Core}
      */
-    private readonly core:Core;
+    private readonly core: Core;
 
     /**
      * Collection of callbacks, indexed by the message they respond to
      * @type {Object.<string, function[]>}
      */
-    private callbacks: {[message:string]: (a:string, b:any, c?:boolean) => void}[] = [];
+    private messageCallbacks: { [message: string]: MessageHandlerFunction[] } = {};
 
     /**
      * Callbacks that will receive any message
-     * @type {function[]}
+     * @type function[]
      */
-    private monitors: void[] = [];
+    private monitorCallbacks: MonitorHandlerFunction[] = [];
 
     /**
      * The public interface that will be passed back to the calling page
@@ -40,37 +45,47 @@ export default class Channel {
      * Used so we can capture and buffer messages to a channel that are sent before the join command completes
      * @type {boolean}
      */
-    joined:boolean = false;
+    joined: boolean = false;
 
 
-
-    constructor(channelName: string, core:Core) {
+    constructor(channelName: string, core: Core) {
         if (!channelName) throw "Attempt to create channel with an empty channelName.";
         this.name = channelName;
         this.core = core;
-        this.interface = this.createInterface();
+        this.interface = new ChannelInterface(this);
     }
 
     receiveMessage(message: string, data: any): void {
-        for (let i = 0, maxi = this.monitors.length; i < maxi; i++) {
+        for (let i = 0, maxi = this.monitorCallbacks.length; i < maxi; i++) {
             setTimeout(() => {
-                this.monitors[i](message, data, false);
+                this.monitorCallbacks[i](message, data, false);
             });
         }
-        if (Array.isArray(this.callbacks[message])) {
-            for (let i = 0, maxi = this.callbacks[message].length; i < maxi; i++) {
+        if (Array.isArray(this.messageCallbacks[message])) {
+            for (let i = 0, maxi = this.messageCallbacks[message].length; i < maxi; i++) {
                 setTimeout(() => {
-                    this.callbacks[message][i](data);
+                    this.messageCallbacks[message][i](data);
                 });
             }
         }
     }
 
-    private createInterface(): ChannelInterface {
-        return {
-            name: 'wip'
+    sendMessage(message: string, data: any): void {
+        for (let i = 0, maxi = this.monitorCallbacks.length; i < maxi; i++) {
+            setTimeout(() => {
+                this.monitorCallbacks[i](message, data, true);
+            });
         }
+        this.core.sendChannelMessage(this.name, message, data);
     }
 
+    registerMessageHandler(message: string, handler: MessageHandlerFunction): void {
+        if (!(message in this.messageCallbacks)) this.messageCallbacks[message] = [];
+        this.messageCallbacks[message].push(handler);
+    }
+
+    registerMonitorHandler(handler: MonitorHandlerFunction): void {
+        this.monitorCallbacks.push(handler);
+    }
 
 }

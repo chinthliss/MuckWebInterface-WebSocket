@@ -22,6 +22,7 @@ export interface coreOptions {
     websocketUrl?: string;
     authenticationUrl?: string;
 }
+
 export default class Core {
 
     environment: string = "production";
@@ -86,7 +87,7 @@ export default class Core {
      *
      * @param {coreOptions} options
      */
-    init(options:coreOptions):void {
+    init(options: coreOptions): void {
         this.environment = options?.environment || import.meta.env.MODE || "production";
         if (options.environment) this.environment = options.environment;
 
