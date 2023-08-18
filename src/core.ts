@@ -1,6 +1,9 @@
-import {Connection} from "./connection";
+import Connection from "./connection";
+import ConnectionFaker from "./connection-faker";
+import ConnectionWebSocket from "./connection-websocket";
+import Channel from "./channel";
 
-enum ConnectionStates {
+export enum ConnectionStates {
     disconnected = 'disconnected', // Only used before startup
     connecting = 'connecting',
     connected = 'connected',
@@ -17,7 +20,7 @@ const msgRegExp: RegExp = /MSG(.*?),(.*?),(.*)/;
  */
 const sysRegExp: RegExp = /SYS(.*?),(.*?),(.*)/;
 
-export interface coreOptions {
+export interface CoreOptions {
     environment?: string;
     websocketUrl?: string;
     authenticationUrl?: string;
@@ -25,27 +28,41 @@ export interface coreOptions {
 
 export default class Core {
 
-    environment: string = "production";
+    private environment: string = "production";
 
-    localStorageAvailable: boolean = false;
+    private localStorageAvailable: boolean = false;
 
-    connectionStatus: ConnectionStates = ConnectionStates.disconnected;
+    private connectionStatus: ConnectionStates = ConnectionStates.disconnected;
 
-    playerDbref: number | null = null;
+    private playerDbref: number | null = null;
 
-    playerName: string | null = null;
+    private playerName: string | null = null;
 
-    playerChangedHandlers: Function[] = [];
+    private playerChangedHandlers: Function[] = [];
 
-    statusChangedHandlers: Function[] = [];
+    private statusChangedHandlers: Function[] = [];
 
-    errorHandlers: Function[] = [];
+    private errorHandlers: Function[] = [];
 
+    private queuedRetryConnectionId:number = -1;
+
+    /**
+     * Whether debug mode is on
+     * @type {boolean}
+      */
     debug: boolean = false;
 
-    connection: Connection | null = null;
+    /**
+     * Our presently configured connection object
+     * @type {Connection?}
+     */
+    private connection: Connection | null = null;
 
-    //channels
+    /**
+     * A lookup list of registered channels
+     * @type {Object}
+     */
+    channels: { [channelName: string]: Channel } = {};
 
     /**
      * Utility function to format errors
@@ -85,12 +102,67 @@ export default class Core {
 
     /**
      *
-     * @param {coreOptions} options
+     * @param {CoreOptions} options
      */
-    init(options: coreOptions): void {
+    init(options: CoreOptions): void {
+
+        if (this.connection) {
+            this.logError("Attempt to run init() when initialisation has already taken place.");
+            return;
+        }
+
+        // Set Environment
         this.environment = options?.environment || import.meta.env.MODE || "production";
         if (options.environment) this.environment = options.environment;
 
+        // Previously this was a test to find something in order of self, window, global
+        let context = globalThis;
+
+        // Figure out whether we have local storage (And load debug option if so)
+        this.localStorageAvailable = 'localStorage' in context;
+        if (this.localStorageAvailable && localStorage.getItem('mwiWebsocket-debug') === 'y') this.debug = true;
+        if (this.environment === 'localdevelopment') this.debug = true; // No local storage in localdev
+
+        // Work out which connection we're using
+        if (this.environment === 'test') this.connection = new ConnectionFaker(this, options);
+        if (!this.connection) {
+            if ("WebSocket" in context) {
+                // Calculate where we're connecting to
+                if (context.location) {
+                    if (!options.websocketUrl) options.websocketUrl =
+                        (location.protocol === 'https:' ? 'wss://' : 'ws://') // Ensure same level of security as page
+                        + location.hostname + "/mwi/ws";
+                    if (!options.authenticationUrl) options.authenticationUrl = location.origin + '/getWebsocketToken';
+                }
+                this.connection = new ConnectionWebSocket(this, options);
+            }
+        }
+        if (!this.connection) throw "Failed to find any usable connection method";
+
+        this.logDebug("Initialized Websocket in environment: " + this.environment);
+
+        this.startConnection();
     }
+
+    /**
+     * Starts connection attempts to the configured connection
+     */
+    private startConnection() {
+        if (!this.connection) {
+            this.logError("Attempt to start a connection when it hasn't been configured yet.");
+            throw "Attempt to start a connection when it hasn't been configured yet."
+        }
+        this.logDebug("Starting connection.");
+        this.queuedRetryConnectionId = -1;
+        this.updateAndDispatchStatus(ConnectionStates.connecting);
+        this.updateAndDispatchPlayer(-1, '');
+        for (let channel in this.channels) {
+            if (this.channels.hasOwnProperty(channel)) {
+                //Channels will be re-joined if required, but we need to let them know to buffer until the muck acknowledges them.
+                this.channels[channel].channelDisconnected();
+            }
+        }
+        this.connection.connect();
+    };
 
 }

@@ -7,10 +7,6 @@ const core = new Core();
  * @borrows init as init
  */
 const websocket = {
-    reset: () => {
-
-    },
-
     init: core.init,
     setDebug: core.setDebug
 }

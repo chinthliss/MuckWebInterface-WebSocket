@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test</title>
+</head>
+<body>
+This page just loads the library to test it. Check the console.
+</body>
+</html>
+<script type="module">
+    import websocket from "../dist/muckwebinterface-websocket";
+
+    window.MwiWebsocket = websocket;
+
+    const options = {
+        // websocketUrl: "wss://mwi.flexiblesurvival.com/mwi/ws",
+        // authenticationUrl: "http://homestead.test/getWebsocketToken",
+        environment: 'localdevelopment'
+    }
+    websocket.init(options);
+
+</script>

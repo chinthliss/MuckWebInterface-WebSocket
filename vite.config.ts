@@ -10,9 +10,15 @@ export default defineConfig({
             name: 'muckwebinterface-websocket',
             fileName: 'muckwebinterface-websocket',
         },
+        copyPublicDir: false
     },
     plugins: [dts()],
     test: {
         include: [resolve(__dirname, 'test/*.ts')]
+    },
+    server: {
+        watch: {
+            usePolling: true
+        }
     }
 });
