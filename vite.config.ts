@@ -1,5 +1,5 @@
-import { resolve } from 'path';
-import { defineConfig } from 'vite';
+import {resolve} from 'path';
+import {defineConfig} from 'vite';
 import dts from 'vite-plugin-dts';
 // https://vitejs.dev/guide/build.html#library-mode
 
@@ -10,7 +10,19 @@ export default defineConfig({
             name: 'muckwebinterface-websocket',
             fileName: 'muckwebinterface-websocket',
         },
-        copyPublicDir: false
+        copyPublicDir: false,
+        rollupOptions: {
+            // make sure to externalize deps that shouldn't be bundled
+            // into your library
+            external: ['axios'],
+            output: {
+                // Provide global variables to use in the UMD build
+                // for externalized deps
+                globals: {
+                    axios: 'axios',
+                },
+            },
+        }
     },
     plugins: [dts()],
     test: {
