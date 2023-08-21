@@ -1,14 +1,12 @@
-import Core from "./core";
-
-const core = new Core();
+import {init, setDebug} from "./core";
 
 /**
  * @borrows setDebug as setDebug
  * @borrows init as init
  */
 const websocket = {
-    init: core.init,
-    setDebug: core.setDebug
+    init: init,
+    setDebug: setDebug
 }
 
-export default websocket;
+export default websocket

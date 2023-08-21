@@ -1,4 +1,12 @@
-import Core, {ConnectionStates} from "./core";
+import {
+    logDebug,
+    logError,
+    updateAndDispatchStatus,
+    updateAndDispatchPlayer,
+    handleConnectionFailure,
+    receivedString
+} from "./core";
+import {ConnectionStates} from "./defs";
 import Connection from "./connection";
 import axios, {AxiosInstance} from "axios";
 
@@ -43,10 +51,7 @@ export default class ConnectionWebSocket extends Connection {
      */
     handshakeCompleted: boolean = false;
 
-    /**
-     * @type {number}
-     */
-    ensureConnectionTimeout:number = -1;
+    ensureConnectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
     /**
      * Used to hold messages that try to send before the initial connection is complete
@@ -61,13 +66,12 @@ export default class ConnectionWebSocket extends Connection {
     axiosInstance: AxiosInstance;
 
     /**
-     * @param {Core} core
      * @param {object} options
      */
-    constructor(core: Core, options:ConnectionWebsocketOptions = {}) {
-        super(core, options);
+    constructor(options: ConnectionWebsocketOptions = {}) {
+        super(options);
 
-        if (!options.websocketUrl || !options.authenticationUrl) throw "Missing mandatory options";
+        if (!options.websocketUrl || !options.authenticationUrl) throw "Missing mandatory options from MwiWebsocket configuration";
 
         this.axiosInstance = axios.create();
 
@@ -80,9 +84,9 @@ export default class ConnectionWebSocket extends Connection {
     }
 
     clearConnectionTimeoutIfSet = () => {
-        if (this.ensureConnectionTimeout !== -1) {
+        if (this.ensureConnectionTimeout) {
             clearTimeout(this.ensureConnectionTimeout);
-            this.ensureConnectionTimeout = -1;
+            this.ensureConnectionTimeout = null;
         }
     };
 
@@ -90,20 +94,20 @@ export default class ConnectionWebSocket extends Connection {
      * @param {CloseEvent} e
      */
     handleWebSocketClose = (e: CloseEvent) => {
-        this.core.logDebug("WebSocket closed: " + (e.reason ? e.reason : 'No reason given.'));
+        logDebug("WebSocket closed: " + (e.reason ? e.reason : 'No reason given.'));
         console.log(e);
         this.clearConnectionTimeoutIfSet();
-        this.core.connectionFailed("Websocket closed with " + (e.reason ? "reason: " + e.reason : "no reason given."));
+        handleConnectionFailure("Websocket closed with " + (e.reason ? "reason: " + e.reason : "no reason given."));
     };
 
     /**
      * @param {Event} e
      */
     handleWebSocketError = (e: Event) => {
-        this.core.logError('An error occurred with the websocket: ' + e)
+        logError('An error occurred with the websocket: ' + e)
         console.log(e);
         this.clearConnectionTimeoutIfSet();
-        this.core.connectionFailed("Websocket returned error: " + e);
+        handleConnectionFailure("Websocket returned error: " + e);
     }
 
     /**
@@ -111,12 +115,12 @@ export default class ConnectionWebSocket extends Connection {
      */
     handleWebSocketMessage = (e: MessageEvent) => {
         let message = e.data.slice(0, -2); //Remove \r\n
-        this.core.receivedString(message);
+        receivedString(message);
     }
 
     openWebsocket(websocketToken: string) {
-        this.core.logDebug("Opening websocket");
-        this.core.updateAndDispatchStatus(ConnectionStates.connecting);
+        logDebug("Opening websocket");
+        updateAndDispatchStatus(ConnectionStates.connecting);
 
         this.connection = new WebSocket(this.websocketUrl, 'mwi');
         this.connection.onopen = () => {
@@ -124,8 +128,8 @@ export default class ConnectionWebSocket extends Connection {
             this.handshakeCompleted = false;
             this.connectingOutgoingMessageBuffer = [];
             this.ensureConnectionTimeout = setTimeout(function () {
-                this.core.logError('WebSocket took too long to complete handshake, assuming failure.');
-                this.core.connectionFailed("Websocket took too long to connect.");
+                logError('WebSocket took too long to complete handshake, assuming failure.');
+                handleConnectionFailure("Websocket took too long to connect.");
             }.bind(this), 10000);
         };
 
@@ -141,26 +145,26 @@ export default class ConnectionWebSocket extends Connection {
                 if (message === 'welcome') {
                     this.connection.send('auth ' + websocketToken + ' ' + location.href);
                     this.receivedWelcome = true;
-                    this.core.logDebug("WebSocket received initial welcome message, attempting to authenticate.");
-                } else this.core.logError("WebSocket got an unexpected message whilst expecting welcome: " + message);
+                    logDebug("WebSocket received initial welcome message, attempting to authenticate.");
+                } else logError("WebSocket got an unexpected message whilst expecting welcome: " + message);
                 return;
             }
 
             if (!this.handshakeCompleted) {
                 if (message.startsWith('accepted ')) {
-                    this.core.logDebug("WebSocket received descr.");
+                    logDebug("WebSocket received descr.");
                     let [descr, playerDbref, playerName] = message.slice(9).split(',');
                     playerDbref = parseInt(playerDbref);
 
-                    this.core.logDebug("Server acknowledged us connected as descr: "
+                    logDebug("Server acknowledged us connected as descr: "
                         + descr + ", playerDbref: " + playerDbref + ", playerName: " + playerName);
 
                     this.clearConnectionTimeoutIfSet();
                     this.handshakeCompleted = true;
                     // Switch the message handler to the proper one
                     this.connection.onmessage = this.handleWebSocketMessage;
-                    this.core.updateAndDispatchStatus(ConnectionStates.connected);
-                    this.core.updateAndDispatchPlayer(playerDbref, playerName);
+                    updateAndDispatchStatus(ConnectionStates.connected);
+                    updateAndDispatchPlayer(playerDbref, playerName);
                     //Resend anything that was buffered
                     for (let i = 0; i++; i < this.connectingOutgoingMessageBuffer.length) {
                         this.sendString(this.connectingOutgoingMessageBuffer[i]);
@@ -169,26 +173,26 @@ export default class ConnectionWebSocket extends Connection {
                     return;
                 }
                 if (message === 'invalidtoken') {
-                    this.core.connectionFailed("Server refused authentication token.");
+                    handleConnectionFailure("Server refused authentication token.");
                     return;
                 }
-                this.core.logError("WebSocket got an unexpected message whilst expecting descr: " + message);
+                logError("WebSocket got an unexpected message whilst expecting descr: " + message);
                 return;
             }
-            this.core.logError("Unexpected message during login: " + message);
+            logError("Unexpected message during login: " + message);
         }
     }
 
     connect() {
         if (this.connection && this.connection.readyState < 2) {
             console.log(this.connection);
-            this.core.logDebug("Attempt to connect whilst socket already connecting.");
+            logDebug("Attempt to connect whilst socket already connecting.");
             return;
         }
 
         //Step 1 - we need to get an authentication token from the webpage
-        let websocketToken;
-        this.core.logDebug("Requesting authentication token from webpage");
+        let websocketToken: string;
+        logDebug("Requesting authentication token from webpage");
         this.axiosInstance.get(this.authenticationUrl)
             .then((response) => {
                 websocketToken = response.data;
@@ -196,29 +200,29 @@ export default class ConnectionWebSocket extends Connection {
                 this.openWebsocket(websocketToken);
             })
             .catch((error) => {
-                this.core.logError("Failed to get an authentication token from the webpage. Error was:" + error);
-                this.core.connectionFailed("Couldn't authenticate");
+                logError("Failed to get an authentication token from the webpage. Error was:" + error);
+                handleConnectionFailure("Couldn't authenticate");
             });
     }
 
     disconnect() {
-        this.core.logDebug(this.connection !== null ? "Closing websocket." : "No websocket to close.");
+        logDebug(this.connection !== null ? "Closing websocket." : "No websocket to close.");
         if (this.connection !== null) this.connection.close(1000, "Disconnected");
         this.connection = null;
     }
 
     sendString(stringToSend: string) {
         if (!this.connection) {
-            this.core.logDebug("Couldn't send message (and not buffering) due to being in connected state: " + stringToSend);
+            logDebug("Couldn't send message (and not buffering) due to being in connected state: " + stringToSend);
             return;
         }
         if (stringToSend.length > 30000) {
-            this.core.logError("Websocket had to abort sending a string because it's over 30,000 characters.");
+            logError("Websocket had to abort sending a string because it's over 30,000 characters.");
             return;
         }
         // Buffer the string if we're still connecting
         if (!this.receivedWelcome || !this.handshakeCompleted) {
-            this.core.logDebug("Buffering outgoing message: " + stringToSend);
+            logDebug("Buffering outgoing message: " + stringToSend);
             return;
         }
         this.connection.send(stringToSend);

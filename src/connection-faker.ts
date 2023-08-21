@@ -1,4 +1,5 @@
-import Core, {ConnectionStates} from "./core";
+import {updateAndDispatchStatus, updateAndDispatchPlayer, receivedString} from "./core";
+import {ConnectionStates} from "./defs";
 import Connection from "./connection";
 
 /**
@@ -6,13 +7,13 @@ import Connection from "./connection";
  */
 export default class ConnectionFaker extends Connection {
 
-    constructor(core: Core, options = {}) {
-        super(core, options);
+    constructor(options = {}) {
+        super(options);
     }
 
     connect(): void {
-        this.core.updateAndDispatchStatus(ConnectionStates.connected);
-        this.core.updateAndDispatchPlayer(1, 'TestPlayer');
+        updateAndDispatchStatus(ConnectionStates.connected);
+        updateAndDispatchPlayer(1, 'TestPlayer');
     }
 
     sendString(stringToSend: string): void {
@@ -20,7 +21,7 @@ export default class ConnectionFaker extends Connection {
         let [channel, message, data] = stringToSend.split(',', 3);
         if (message === 'reflect') {
             channel = channel.slice(3);
-            this.core.receivedString('MSG' + channel + ',reflected,' + data);
+            receivedString('MSG' + channel + ',reflected,' + data);
         }
     }
 

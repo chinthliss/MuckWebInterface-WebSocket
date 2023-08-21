@@ -1,13 +1,7 @@
-import Core from './core.js';
+import {sendChannelMessage} from './core';
 import ChannelInterface from "./channel-interface";
 
-export type MessageHandlerFunction = (
-    (data: any) => void
-    )
-
-export type MonitorHandlerFunction = (
-    (message: string, data: any, outgoing: boolean) => void
-    )
+import {MessageHandlerFunction, MonitorHandlerFunction} from "./defs";
 
 export default class Channel {
 
@@ -15,15 +9,7 @@ export default class Channel {
      * This channel's name
      * @type {string}
      */
-
     readonly name: string;
-
-    /**
-     * Link back to the core for communication
-     * @type {Core}
-     * @private
-     */
-    private readonly core: Core;
 
     /**
      * Collection of callbacks, indexed by the message they respond to
@@ -64,12 +50,10 @@ export default class Channel {
     /**
      * Creates a new channel with the given name
      * @param {string} channelName
-     * @param {Core} core
      */
-    constructor(channelName: string, core: Core) {
+    constructor(channelName: string) {
         if (!channelName) throw "Attempt to create channel with an empty channelName.";
         this.name = channelName;
-        this.core = core;
         this.interface = new ChannelInterface(this);
     }
 
@@ -109,7 +93,7 @@ export default class Channel {
                 this.monitorCallbacks[i](message, data, true);
             });
         }
-        this.core.sendChannelMessage(this.name, message, data);
+        sendChannelMessage(this.name, message, data);
     }
 
 
@@ -147,5 +131,9 @@ export default class Channel {
      */
     channelDisconnected(): void {
         this.joined = false;
+    }
+
+    isChannelJoined(): boolean {
+        return this.joined;
     }
 }
