@@ -1,8 +1,10 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import websocket from '../src/index.js';
 
-test('Core', () => {
+test('Initializes successfully', () => {
     expect(websocket.init).toBeTypeOf('function');
-    expect(websocket.init).toHaveReturned();
+    const initSpy = vi.fn(websocket.init);
+    initSpy();
+    expect(initSpy).toHaveReturned();
 });

@@ -239,7 +239,7 @@ const receivedChannelMessage = (channelName: string, message: string, data: any)
 /**
  * Called by the hosting program to start everything up
  */
-export const init = (options: CoreOptions): void => {
+export const init = (options: CoreOptions = {}): void => {
 
     if (connection) {
         logError("Attempt to run init() when initialisation has already taken place.");
