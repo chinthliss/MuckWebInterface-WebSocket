@@ -4,6 +4,7 @@ import {
     updateAndDispatchStatus,
     updateAndDispatchPlayer,
     handleConnectionFailure,
+    handleConnectionSuccess,
     receivedStringFromConnection
 } from "./core";
 import {ConnectionStates} from "./defs";
@@ -69,7 +70,7 @@ export default class ConnectionWebSocket extends Connection {
      * Constructor
      */
     constructor(options: ConnectionWebsocketOptions = {}) {
-        super(options);
+        super();
 
         if (!options.websocketUrl || !options.authenticationUrl) throw "Missing mandatory options from MwiWebsocket configuration";
 
@@ -163,6 +164,7 @@ export default class ConnectionWebSocket extends Connection {
                     this.handshakeCompleted = true;
                     // Switch the message handler to the proper one
                     this.connection.onmessage = this.handleWebSocketMessage;
+                    handleConnectionSuccess();
                     updateAndDispatchStatus(ConnectionStates.connected);
                     updateAndDispatchPlayer(playerDbref, playerName);
                     //Resend anything that was buffered

@@ -23,7 +23,7 @@ export default class Channel {
     /**
      * The public interface that will be passed back to the calling page
      */
-    private interface: ChannelInterface;
+    interface: ChannelInterface;
 
     /**
      * Used so we can capture and buffer messages to a channel that are sent before the join command completes

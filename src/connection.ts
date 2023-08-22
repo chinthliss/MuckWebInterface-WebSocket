@@ -1,13 +1,4 @@
 export default abstract class Connection {
-    /**
-     * Constructor
-     */
-    protected constructor(options: object = {}) {
-    }
-
-    /////////////////////////////////////
-    //Functions that should be replaced
-    /////////////////////////////////////
 
     /**
      * Start up the connection

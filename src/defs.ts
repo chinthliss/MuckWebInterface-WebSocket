@@ -12,6 +12,7 @@ export interface CoreOptions {
     environment?: string;
     websocketUrl?: string;
     authenticationUrl?: string;
+    useFaker?: boolean;
 }
 
 export type ChannelMessageCallback = (

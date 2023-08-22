@@ -14,11 +14,11 @@ This page just loads the library to test it. Check the console.
     window.mwiWebsocket = websocket;
 
     const options = {
-        websocketUrl: "wss://localhost/ws",
-        authenticationUrl: "http://localhost/getWebsocketToken",
         //websocketUrl: "wss://mwi.flexiblesurvival.com/mwi/ws",
         //authenticationUrl: "http://homestead.test/getWebsocketToken",
-        environment: 'localdevelopment'
+        environment: 'localdevelopment',
+        // Whether to use a faker instead of attempt an connection
+        useFaker: true
     }
     websocket.init(options);
 

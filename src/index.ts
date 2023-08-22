@@ -1,20 +1,27 @@
-import {init, setDebug, onPlayerChanged, onError, onStatusChanged, stopConnection} from "./core";
+import {
+    init,
+    setDebug,
+    onPlayerChanged,
+    onError,
+    onStatusChanged,
+    stopConnection,
+    getPlayerDbref,
+    getPlayerName,
+    getConnectionState,
+    isPlayerSet,
+    channel
+} from "./core";
 
-/**
- * @borrows init as init
- * @borrows setDebug as setDebug
- * @borrows onPlayerChanged as onPlayerChanged
- * @borrows onError as onError
- * @borrows onStatusChanged as onStatusChanged
- * @borrows stopConnection as shutdown
- */
-const library = {
+export default {
     init: init,
     setDebug: setDebug,
     onPlayerChanged: onPlayerChanged,
     onError: onError,
     onStatusChanged: onStatusChanged,
-    shutdown: stopConnection
+    shutdown: stopConnection,
+    getPlayerDbref: getPlayerDbref,
+    getPlayerName: getPlayerName,
+    getConnectionState: getConnectionState,
+    isPlayerSet: isPlayerSet,
+    channel: channel
 }
-
-export default library

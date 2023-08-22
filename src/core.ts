@@ -2,6 +2,7 @@ import Connection from "./connection";
 import ConnectionFaker from "./connection-faker";
 import ConnectionWebSocket from "./connection-websocket";
 import Channel from "./channel";
+import ChannelInterface from "./channel-interface";
 import {
     InitialMode,
     ConnectionErrorCallback,
@@ -67,6 +68,11 @@ let connectionErrorCallbacks: ConnectionErrorCallback[] = [];
 let queuedConnectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
+ * Number of failed attempts, so we can slow down on the retries over time
+ */
+let connectionFailures: number = 0;
+
+/**
  * Whether debug mode is on
  */
 let debug: boolean = false;
@@ -100,7 +106,7 @@ export const logDebug = (message: string): void => {
  */
 export const setDebug = (trueOrFalse: boolean): void => {
     if (!localStorageAvailable) {
-        console.log("Can't set debug preference - local storage is not available.");
+        logError("Can't set debug preference - local storage is not available.");
         return;
     }
     if (trueOrFalse) {
@@ -114,23 +120,120 @@ export const setDebug = (trueOrFalse: boolean): void => {
     }
 }
 
-export const handleConnectionFailure = (errorMessage: string): void => {
-    throw "Not Implemented Yet";
-};
+/**
+ * Called by the connection. If the fault wasn't fatal, a reconnect is queued
+ */
+export const handleConnectionFailure = (errorMessage: string, fatal: boolean = false): void => {
+    connectionFailures++;
+    dispatchError(errorMessage);
+    // Start again unless the problem was fatal
+    if (fatal) {
+        logError("Fatal Connection Error - cancelling any further attempt to connect.");
+        stopConnection();
+    } else {
+        queueConnection()
+    }
+}
 
 /**
- * Used by the present connection to pass back a string for processing
+ * Called by the connection. Stops any queued connections and resets failed count
+ * Does not handle setting player-dbref/player-name since that can vary on connection
+ */
+export const handleConnectionSuccess = () => {
+    logDebug("Resetting failed count due to success.");
+    clearConnectionTimeout();
+    connectionFailures = 0;
+}
+
+/**
+ * Used by the present connection to pass back a raw string for processing
  */
 export const receivedStringFromConnection = (stringReceived: string): void => {
-    throw "Not Implemented Yet";
+    if (stringReceived.indexOf('MSG') === 0) {
+        let channel: string, message: string, data: any;
+        try {
+            let dataAsJson: string | null;
+            [, channel, message, dataAsJson] = stringReceived.match(msgRegExp) || [null, '', '', null];
+            data = (dataAsJson ? null : JSON.parse(<string>dataAsJson));
+        } catch (e) {
+            logError("Failed to parse string as incoming channel message: " + stringReceived);
+            console.log(e);
+            return;
+        }
+        if (message === '') {
+            logError("Incoming channel message had an empty message: " + stringReceived);
+            return;
+        }
+        if (debug) console.log("[ << " + channel + "." + message + "] ", data);
+        receivedChannelMessage(channel, message, data);
+        return;
+    }
+    if (stringReceived.indexOf('SYS') === 0) {
+        let message: string, data: any;
+        try {
+            let dataAsJson: string | null;
+            [, message, dataAsJson] = stringReceived.match(sysRegExp) || [null, '', null];
+            data = (dataAsJson ? null : JSON.parse(<string>dataAsJson));
+        } catch (e) {
+            logError("Failed to parse string as incoming system message: " + stringReceived);
+            return;
+        }
+        if (message === '') {
+            logError("Incoming system message had an empty message: " + stringReceived);
+            return;
+        }
+        if (debug) console.log("[ << " + message + "] ", data);
+        receivedSystemMessage(message, data);
+        return;
+    }
+    logError("Don't know what to do with the string: " + stringReceived);
 };
 
 export const sendChannelMessage = (channel: string, message: string, data: any): void => {
-    throw "Not Implemented Yet";
+    if (!connection) {
+        logDebug(`Attempt to send a channel message whilst not connected: ${channel}:${message}`);
+        return;
+    }
+    if (debug) console.log("[ >> " + channel + "." + message + "] ", data);
+    let parsedData: string = (typeof data !== 'undefined' ? JSON.stringify(data) : '');
+    let parsedMessage: string = ["MSG", channel, ',', message, ',', parsedData].join('');
+    connection.sendString(parsedMessage);
 }
 
 const sendSystemMessage = (message: string, data: any): void => {
-    throw "Not Implemented Yet";
+    if (!connection) {
+        logDebug(`Attempt to send a system message whilst not connected: ${message}`);
+        return;
+    }
+    if (debug) console.log("[ >> " + message + "] ", data);
+    let parsedData: string = (typeof data !== 'undefined' ? JSON.stringify(data) : '');
+    let parsedMessage: string = ["SYS", message, ',', parsedData].join('');
+    connection.sendString(parsedMessage);
+}
+
+const receivedSystemMessage = (message: string, data: any): void => {
+    switch (message) {
+        case 'channel':
+            // Let the channel know it's joined, so it can process buffered items
+            if (data in channels) channels[data].channelConnected();
+            else logError("Muck acknowledged joining a channel we weren't aware of! Channel: " + data);
+            break;
+        case 'test':
+            logDebug("Mwi-Websocket Test message received. Data=" + data);
+            break;
+        case 'ping': //This is actually http only, websockets do it at a lower level
+            sendSystemMessage('pong', data);
+            break;
+        default:
+            logError("Unrecognized system message received: " + message);
+    }
+}
+
+const receivedChannelMessage = (channelName: string, message: string, data: any): void => {
+    if (channelName in channels)
+        channels[channelName].receiveMessage(message, data);
+    else
+        logError("Received message on channel we're not aware of! Channel = " + channelName);
 }
 
 /**
@@ -153,10 +256,10 @@ export const init = (options: CoreOptions): void => {
     // Figure out whether we have local storage (And load debug option if so)
     localStorageAvailable = 'localStorage' in context;
     if (localStorageAvailable && localStorage.getItem('mwiWebsocket-debug') === 'y') debug = true;
-    if (mode === 'localdevelopment') debug = true; // No local storage in localdev
+    if (mode === 'localdevelopment') debug = true; // No local storage in this mode, so assuming
 
     // Work out which connection we're using
-    if (mode === 'test') connection = new ConnectionFaker(options);
+    if (mode === 'test' || options.useFaker) connection = new ConnectionFaker(options);
     if (!connection) {
         if ("WebSocket" in context) {
             // Calculate where we're connecting to
@@ -180,9 +283,9 @@ export const init = (options: CoreOptions): void => {
  * Used as entry point for both new connections and reconnects
  */
 const queueConnection = () => {
-    let delay: number = 0; // Leaving room to turn this into a calculation
+    let delay: number = connectionFailures * 100;
     queuedConnectionTimeout = setTimeout(startConnection, delay);
-    logDebug("Connection retry queued.");
+    logDebug(`Connection attempt queued with a delay of ${delay}ms.`);
 }
 
 /**
@@ -232,6 +335,19 @@ export const stopConnection = () => {
         }
     }
     connection.disconnect();
+}
+
+/**
+ * Returns a channel interface to talk to a channel, joining it if required.
+ */
+export const channel = (channelName: string): ChannelInterface => {
+    if (channelName in channels) return channels[channelName].interface;
+    logDebug('New Channel - ' + channelName);
+    let newChannel: Channel = new Channel(channelName);
+    channels[channelName] = newChannel;
+    //Only send join request if we have a connection, as the connection process will also handle joins
+    if (connectionStatus === ConnectionStates.connected) sendSystemMessage('joinChannels', channelName);
+    return newChannel.interface;
 }
 
 //region Event Processing
@@ -305,9 +421,9 @@ export const updateAndDispatchStatus = (newStatus: ConnectionStates): void => {
 };
 
 /**
- * Called when there's a critical error
+ * Called when there's an error
  */
-const dispatchCriticalError = (error: string): void => {
+const dispatchError = (error: string): void => {
     logError("ERROR: " + error);
     for (let i = 0, maxi = connectionErrorCallbacks.length; i < maxi; i++) {
         try {
@@ -317,3 +433,36 @@ const dispatchCriticalError = (error: string): void => {
     }
 }
 //endregion Event Processing
+
+//region External functions for library specifically
+
+/**
+ * Name of the present player. Empty string if no player.
+ */
+export const getPlayerName = (): string | null => {
+    return playerName;
+}
+
+/**
+ * Dbref of player represented as a number. -1 if no player.
+ */
+export const getPlayerDbref = (): number | null => {
+    return playerDbref;
+}
+
+/**
+ * Utility function to return whether a player exists
+ */
+export const isPlayerSet = (): boolean => {
+    return playerDbref !== null;
+}
+
+/**
+ * Returns the present connection state.
+ * One of: connecting, login, connected, failed
+ */
+export const getConnectionState = (): ConnectionStates => {
+    return connectionStatus;
+}
+
+//endregion External functions for library specifically
