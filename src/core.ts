@@ -105,19 +105,21 @@ export const logDebug = (message: string): void => {
  * Enables or disables printing debug information into the console
  */
 export const setDebug = (trueOrFalse: boolean): void => {
-    if (!localStorageAvailable) {
-        logError("Can't set debug preference - local storage is not available.");
-        return;
-    }
     if (trueOrFalse) {
         debug = true;
         console.log("Console logging enabled.");
-        localStorage.setItem('mwiWebsocket-debug', 'y');
     } else {
         debug = false;
         console.log("Console logging disabled.");
-        localStorage.removeItem('mwiWebsocket-debug');
     }
+    if (!localStorageAvailable) {
+        logError("Can't save debug preference - local storage is not available.");
+        return;
+    }
+    if (debug)
+        localStorage.setItem('mwiWebsocket-debug', 'y');
+    else
+        localStorage.removeItem('mwiWebsocket-debug');
 }
 
 /**
