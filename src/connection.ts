@@ -1,6 +1,6 @@
 export default abstract class Connection {
     /**
-     * @param {object} options Intended more to be used by overriding classes
+     * Constructor
      */
     protected constructor(options: object = {}) {
     }
@@ -15,8 +15,12 @@ export default abstract class Connection {
     abstract connect(): void;
 
     /**
+     * Stop the connection
+     */
+    abstract disconnect(): void;
+
+    /**
      * Send a string over the connection
-     * @param stringToSend
      */
     abstract sendString(stringToSend: string): void;
 

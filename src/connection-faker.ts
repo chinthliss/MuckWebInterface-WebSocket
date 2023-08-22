@@ -1,4 +1,4 @@
-import {updateAndDispatchStatus, updateAndDispatchPlayer, receivedString} from "./core";
+import {updateAndDispatchStatus, updateAndDispatchPlayer, receivedStringFromConnection} from "./core";
 import {ConnectionStates} from "./defs";
 import Connection from "./connection";
 
@@ -21,7 +21,7 @@ export default class ConnectionFaker extends Connection {
         let [channel, message, data] = stringToSend.split(',', 3);
         if (message === 'reflect') {
             channel = channel.slice(3);
-            receivedString('MSG' + channel + ',reflected,' + data);
+            receivedStringFromConnection('MSG' + channel + ',reflected,' + data);
         }
     }
 

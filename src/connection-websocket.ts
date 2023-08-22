@@ -4,7 +4,7 @@ import {
     updateAndDispatchStatus,
     updateAndDispatchPlayer,
     handleConnectionFailure,
-    receivedString
+    receivedStringFromConnection
 } from "./core";
 import {ConnectionStates} from "./defs";
 import Connection from "./connection";
@@ -22,51 +22,51 @@ export default class ConnectionWebSocket extends Connection {
 
     /**
      * In case we're outdated and need a refresh.
-     * @type {number}
      */
-    protocolVersion: number = 1;
+    private protocolVersion: number = 1;
 
     /**
-     * @type {string}
+     * The url used to request an access token
      */
-    authenticationUrl: string;
+    private authenticationUrl: string;
 
     /**
-     * @type {string}
+     * The url the websocket will connect to
      */
-    websocketUrl: string;
+    private websocketUrl: string;
 
     /**
-     * @type {WebSocket | null}
+     * The websocket
      */
-    connection: WebSocket | null = null;
+    private connection: WebSocket | null = null;
 
     /**
-     * @type {boolean}
+     * Used as part of the handshake
      */
-    receivedWelcome: boolean = false;
+    private handshakeReceivedWelcome: boolean = false;
 
     /**
-     * @type {boolean}
+     * Used as part of the handshake
      */
-    handshakeCompleted: boolean = false;
-
-    ensureConnectionTimeout: ReturnType<typeof setTimeout> | null = null;
+    private handshakeCompleted: boolean = false;
 
     /**
-     * Used to hold messages that try to send before the initial connection is complete
-     * @type {string[]}
+     *  Use as part of the handshake
      */
-    connectingOutgoingMessageBuffer: string[] = [];
+    private handshakeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    /**
+     * Used to hold messages that tried to send before the initial connection is complete
+     */
+    private connectingOutgoingMessageBuffer: string[] = [];
 
     /**
      * Our own Axios instance, so we don't interfere/fight with a hosting pages interceptors
-     * @type {AxiosInstance}
      */
-    axiosInstance: AxiosInstance;
+    private axiosInstance: AxiosInstance;
 
     /**
-     * @param {object} options
+     * Constructor
      */
     constructor(options: ConnectionWebsocketOptions = {}) {
         super(options);
@@ -83,51 +83,51 @@ export default class ConnectionWebSocket extends Connection {
         this.websocketUrl += '?protocolVersion=' + this.protocolVersion;
     }
 
-    clearConnectionTimeoutIfSet = () => {
-        if (this.ensureConnectionTimeout) {
-            clearTimeout(this.ensureConnectionTimeout);
-            this.ensureConnectionTimeout = null;
+    private clearHandshakeTimeoutIfSet = () => {
+        if (this.handshakeTimeout) {
+            clearTimeout(this.handshakeTimeout);
+            this.handshakeTimeout = null;
         }
     };
 
     /**
-     * @param {CloseEvent} e
+     * Called internally to handle connection closes from the websocket
      */
-    handleWebSocketClose = (e: CloseEvent) => {
+    private handleWebSocketClose = (e: CloseEvent) => {
         logDebug("WebSocket closed: " + (e.reason ? e.reason : 'No reason given.'));
         console.log(e);
-        this.clearConnectionTimeoutIfSet();
+        this.clearHandshakeTimeoutIfSet();
         handleConnectionFailure("Websocket closed with " + (e.reason ? "reason: " + e.reason : "no reason given."));
     };
 
     /**
-     * @param {Event} e
+     * Called internally to handle errors from the websocket
      */
-    handleWebSocketError = (e: Event) => {
+    private handleWebSocketError = (e: Event) => {
         logError('An error occurred with the websocket: ' + e)
         console.log(e);
-        this.clearConnectionTimeoutIfSet();
+        this.clearHandshakeTimeoutIfSet();
         handleConnectionFailure("Websocket returned error: " + e);
     }
 
     /**
-     * @param {MessageEvent} e
+     * Internal handler for capturing messages from the websocket
      */
-    handleWebSocketMessage = (e: MessageEvent) => {
+    private handleWebSocketMessage = (e: MessageEvent) => {
         let message = e.data.slice(0, -2); //Remove \r\n
-        receivedString(message);
+        receivedStringFromConnection(message);
     }
 
-    openWebsocket(websocketToken: string) {
+    private openWebsocket(websocketToken: string) {
         logDebug("Opening websocket");
         updateAndDispatchStatus(ConnectionStates.connecting);
 
         this.connection = new WebSocket(this.websocketUrl, 'mwi');
         this.connection.onopen = () => {
-            this.receivedWelcome = false;
+            this.handshakeReceivedWelcome = false;
             this.handshakeCompleted = false;
             this.connectingOutgoingMessageBuffer = [];
-            this.ensureConnectionTimeout = setTimeout(function () {
+            this.handshakeTimeout = setTimeout(function () {
                 logError('WebSocket took too long to complete handshake, assuming failure.');
                 handleConnectionFailure("Websocket took too long to connect.");
             }.bind(this), 10000);
@@ -141,10 +141,10 @@ export default class ConnectionWebSocket extends Connection {
             if (!this.connection) return; // Don't react if we disconnected
             let message = e.data.slice(0, -2); //Remove \r\n
 
-            if (!this.receivedWelcome) {
+            if (!this.handshakeReceivedWelcome) {
                 if (message === 'welcome') {
                     this.connection.send('auth ' + websocketToken + ' ' + location.href);
-                    this.receivedWelcome = true;
+                    this.handshakeReceivedWelcome = true;
                     logDebug("WebSocket received initial welcome message, attempting to authenticate.");
                 } else logError("WebSocket got an unexpected message whilst expecting welcome: " + message);
                 return;
@@ -159,7 +159,7 @@ export default class ConnectionWebSocket extends Connection {
                     logDebug("Server acknowledged us connected as descr: "
                         + descr + ", playerDbref: " + playerDbref + ", playerName: " + playerName);
 
-                    this.clearConnectionTimeoutIfSet();
+                    this.clearHandshakeTimeoutIfSet();
                     this.handshakeCompleted = true;
                     // Switch the message handler to the proper one
                     this.connection.onmessage = this.handleWebSocketMessage;
@@ -183,10 +183,13 @@ export default class ConnectionWebSocket extends Connection {
         }
     }
 
+    /**
+     * Starts the websocket up and connects it.
+     * Will fail if the websocket is already active.
+     */
     connect() {
-        if (this.connection && this.connection.readyState < 2) {
-            console.log(this.connection);
-            logDebug("Attempt to connect whilst socket already connecting.");
+        if (this.connection) {
+            logDebug("Attempt to connect websocket when it's already active.");
             return;
         }
 
@@ -205,15 +208,21 @@ export default class ConnectionWebSocket extends Connection {
             });
     }
 
+    /**
+     * Disconnects the websocket and tidies it up
+     */
     disconnect() {
         logDebug(this.connection !== null ? "Closing websocket." : "No websocket to close.");
         if (this.connection !== null) this.connection.close(1000, "Disconnected");
         this.connection = null;
     }
 
+    /**
+     * Send a string over the websocket
+     */
     sendString(stringToSend: string) {
         if (!this.connection) {
-            logDebug("Couldn't send message (and not buffering) due to being in connected state: " + stringToSend);
+            logDebug("Couldn't send message (and not buffering) due to being in an unconnected state: " + stringToSend);
             return;
         }
         if (stringToSend.length > 30000) {
@@ -221,8 +230,9 @@ export default class ConnectionWebSocket extends Connection {
             return;
         }
         // Buffer the string if we're still connecting
-        if (!this.receivedWelcome || !this.handshakeCompleted) {
+        if (!this.handshakeReceivedWelcome || !this.handshakeCompleted) {
             logDebug("Buffering outgoing message: " + stringToSend);
+            this.connectingOutgoingMessageBuffer.push(stringToSend);
             return;
         }
         this.connection.send(stringToSend);

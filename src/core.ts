@@ -14,23 +14,50 @@ const msgRegExp: RegExp = /MSG(.*?),(.*?),(.*)/;
  */
 const sysRegExp: RegExp = /SYS(.*?),(.*?),(.*)/;
 
+/**
+ * Present environment we're operating in
+ */
 let environment: string = "production";
 
+/**
+ * Whether we can use local storage. Set in initialization.
+ */
 let localStorageAvailable: boolean = false;
 
+/**
+ * Present connection status
+ */
 let connectionStatus: ConnectionStates = ConnectionStates.disconnected;
 
+/**
+ * Present player's database reference or null
+ */
 let playerDbref: number | null = null;
 
+/**
+ * Present player's name or null
+ */
 let playerName: string | null = null;
 
+/**
+ * Callbacks to be notified when the player gets changed
+ */
 let playerChangedHandlers: Function[] = [];
 
+/**
+ * Callbacks to be notified when the connection status gets changed
+ */
 let statusChangedHandlers: Function[] = [];
 
+/**
+ * Callbacks to be notified when something goes wrong
+ */
 let errorHandlers: Function[] = [];
 
-let queuedRetryConnectionId: number = -1;
+/**
+ * Timeout mostly used to ensure we don't have multiple connection attempts
+ */
+let queuedConnectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Whether debug mode is on
@@ -49,7 +76,6 @@ const channels: { [channelName: string]: Channel } = {};
 
 /**
  * Utility function to format errors
- * @param {string} message
  */
 export const logError = (message: string): void => {
     console.log("Mwi-Websocket ERROR: " + message);
@@ -57,7 +83,6 @@ export const logError = (message: string): void => {
 
 /**
  * Utility function to format debug lines and omit if disabled
- * @param {string} message
  */
 export const logDebug = (message: string): void => {
     if (debug) console.log("Mwi-Websocket DEBUG: " + message);
@@ -65,7 +90,6 @@ export const logDebug = (message: string): void => {
 
 /**
  * Enables or disables printing debug information into the console
- * @param trueOrFalse
  */
 export const setDebug = (trueOrFalse: boolean): void => {
     if (!localStorageAvailable) {
@@ -86,7 +110,11 @@ export const setDebug = (trueOrFalse: boolean): void => {
 export const handleConnectionFailure = (errorMessage: string): void => {
     throw "Not Implemented Yet";
 };
-export const receivedString = (stringReceived: string): void => {
+
+/**
+ * Used by the present connection to pass back a string for processing
+ */
+export const receivedStringFromConnection = (stringReceived: string): void => {
     throw "Not Implemented Yet";
 };
 
@@ -100,7 +128,6 @@ const sendSystemMessage = (message: string, data: any): void => {
 
 /**
  * Called by the hosting program to start everything up
- * @param {CoreOptions} options
  */
 export const init = (options: CoreOptions): void => {
 
@@ -139,7 +166,26 @@ export const init = (options: CoreOptions): void => {
 
     logDebug("Initialized Websocket in environment: " + environment);
 
-    startConnection();
+    queueConnection();
+}
+
+/**
+ * Used as entry point for both new connections and reconnects
+ */
+const queueConnection = () => {
+    let delay: number = 0; // Leaving room to turn this into a calculation
+    queuedConnectionTimeout = setTimeout(startConnection, delay);
+    logDebug("Connection retry queued.");
+}
+
+/**
+ * Utility function to unset the connection timeout
+ */
+const clearConnectionTimeout = () => {
+    if (queuedConnectionTimeout) {
+        clearTimeout(queuedConnectionTimeout);
+        queuedConnectionTimeout = null;
+    }
 }
 
 /**
@@ -151,9 +197,9 @@ const startConnection = () => {
         throw "Attempt to start a connection when it hasn't been configured yet."
     }
     logDebug("Starting connection.");
-    queuedRetryConnectionId = -1;
+    clearConnectionTimeout();
     updateAndDispatchStatus(ConnectionStates.connecting);
-    updateAndDispatchPlayer(-1, '');
+    updateAndDispatchPlayer(null, null);
     for (let channel in channels) {
         if (channels.hasOwnProperty(channel)) {
             //Channels will be re-joined if required, but we need to let them know to buffer until the muck acknowledges them.
@@ -163,38 +209,52 @@ const startConnection = () => {
     connection.connect();
 };
 
+/**
+ * Shut down the connection completely
+ */
+const stopConnection = () => {
+    if (!connection) return;
+    logDebug("Stopping connection.");
+    clearConnectionTimeout();
+    updateAndDispatchStatus(ConnectionStates.disabled);
+    updateAndDispatchPlayer(null, null);
+    for (let channel in channels) {
+        if (channels.hasOwnProperty(channel)) {
+            //Channels will be re-joined if required, but we need to let them know to buffer until the muck acknowledges them.
+            channels[channel].channelDisconnected();
+        }
+    }
+    connection.disconnect();
+}
+
 //region Event Processing
 
 /**
- *
- * @param callback
+ * Register a callback to be notified when the active player changes
+ * Will be called with (playerDbref, playerName).
  */
-const onPlayerChanged = (callback) => {
+export const onPlayerChanged = (callback) => {
     playerChangedHandlers.push(callback);
 }
 
 /**
- *
- * @param {function} callback
+ * Register a callback to be notified when there's an error
  */
-const onError = (callback) => {
+export const onError = (callback) => {
     errorHandlers.push(callback);
 }
 
 /**
  * Registers a new callback that'll be informed of changes to the connection status.
  * The passed callback will immediately be called with the present status too.
- * @param {function} callback
  */
-const onStatusChanged = (callback): void => {
+export const onStatusChanged = (callback): void => {
     statusChangedHandlers.push(callback);
     callback(connectionStatus);
 }
 
 /**
  * Called by present connection
- * @param {number} newDbref New Dbref for player
- * @param {string} newName New name for the player
  */
 export const updateAndDispatchPlayer = (newDbref, newName): void => {
     if (playerDbref === newDbref && playerName === newName) return;
@@ -211,7 +271,6 @@ export const updateAndDispatchPlayer = (newDbref, newName): void => {
 
 /**
  * Called by present connection
- * @param {ConnectionStates} newStatus The New status
  */
 export const updateAndDispatchStatus = (newStatus: ConnectionStates): void => {
     if (connectionStatus === newStatus) return;
@@ -239,7 +298,7 @@ export const updateAndDispatchStatus = (newStatus: ConnectionStates): void => {
 };
 
 /**
- * @param {string} error
+ * Called when there's a critical error
  */
 const dispatchCriticalError = (error): void => {
     logError("ERROR: " + error);
