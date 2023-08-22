@@ -1,4 +1,10 @@
-The underlying code will handle the actual connection.
+The underlying code will handle the actual connection but it doesn't connect by default.
+
+Once imported and set to a global, assumed to be mwiWebsocket here, use:
+
+```
+mwiWebsocket.init();
+```
 
 # Channels
 
