@@ -1,3 +1,6 @@
+// Pretty much just here so that it can be replaced if required
+export const InitialMode = import.meta.env.MODE;
+
 export enum ConnectionStates {
     disconnected = 'disconnected', // Only used before startup
     connecting = 'connecting',

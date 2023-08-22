@@ -16,6 +16,10 @@ export default class ConnectionFaker extends Connection {
         updateAndDispatchPlayer(1, 'TestPlayer');
     }
 
+    disconnect(): void {
+
+    }
+
     sendString(stringToSend: string): void {
         //Reflect anything that has 'reflect' as the message
         let [channel, message, data] = stringToSend.split(',', 3);

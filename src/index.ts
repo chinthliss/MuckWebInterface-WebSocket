@@ -1,4 +1,4 @@
-import {init, setDebug, onPlayerChanged, onError, onStatusChanged} from "./core";
+import {init, setDebug, onPlayerChanged, onError, onStatusChanged, stopConnection} from "./core";
 
 /**
  * @borrows init as init
@@ -6,13 +6,15 @@ import {init, setDebug, onPlayerChanged, onError, onStatusChanged} from "./core"
  * @borrows onPlayerChanged as onPlayerChanged
  * @borrows onError as onError
  * @borrows onStatusChanged as onStatusChanged
+ * @borrows stopConnection as shutdown
  */
 const library = {
     init: init,
     setDebug: setDebug,
     onPlayerChanged: onPlayerChanged,
     onError: onError,
-    onStatusChanged: onStatusChanged
+    onStatusChanged: onStatusChanged,
+    shutdown: stopConnection
 }
 
 export default library

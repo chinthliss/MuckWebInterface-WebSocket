@@ -3,6 +3,7 @@ import ConnectionFaker from "./connection-faker";
 import ConnectionWebSocket from "./connection-websocket";
 import Channel from "./channel";
 import {
+    InitialMode,
     ConnectionErrorCallback,
     ConnectionStates,
     ConnectionStatusCallback,
@@ -21,9 +22,9 @@ const msgRegExp: RegExp = /MSG(.*?),(.*?),(.*)/;
 const sysRegExp: RegExp = /SYS(.*?),(.*?),(.*)/;
 
 /**
- * Present environment we're operating in
+ * Present mode we're operating in
  */
-let environment: string = "production";
+let mode: string = "production";
 
 /**
  * Whether we can use local storage. Set in initialization.
@@ -143,8 +144,8 @@ export const init = (options: CoreOptions): void => {
     }
 
     // Set Environment
-    environment = options?.environment || import.meta.env.MODE || "production";
-    if (options.environment) environment = options.environment;
+    mode = options?.environment || InitialMode || "production";
+    if (options.environment) mode = options.environment;
 
     // Previously this was a test to find something in order of self, window, global
     const context = globalThis;
@@ -152,10 +153,10 @@ export const init = (options: CoreOptions): void => {
     // Figure out whether we have local storage (And load debug option if so)
     localStorageAvailable = 'localStorage' in context;
     if (localStorageAvailable && localStorage.getItem('mwiWebsocket-debug') === 'y') debug = true;
-    if (environment === 'localdevelopment') debug = true; // No local storage in localdev
+    if (mode === 'localdevelopment') debug = true; // No local storage in localdev
 
     // Work out which connection we're using
-    if (environment === 'test') connection = new ConnectionFaker(options);
+    if (mode === 'test') connection = new ConnectionFaker(options);
     if (!connection) {
         if ("WebSocket" in context) {
             // Calculate where we're connecting to
@@ -170,7 +171,7 @@ export const init = (options: CoreOptions): void => {
     }
     if (!connection) throw "Failed to find any usable connection method";
 
-    logDebug("Initialized Websocket in environment: " + environment);
+    logDebug("Initialized Websocket in environment: " + mode);
 
     queueConnection();
 }
@@ -216,9 +217,9 @@ const startConnection = () => {
 };
 
 /**
- * Shut down the connection completely
+ * Shut down the connection completely. Will stop any further attempts to connect.
  */
-const stopConnection = () => {
+export const stopConnection = () => {
     if (!connection) return;
     logDebug("Stopping connection.");
     clearConnectionTimeout();
@@ -306,7 +307,7 @@ export const updateAndDispatchStatus = (newStatus: ConnectionStates): void => {
 /**
  * Called when there's a critical error
  */
-const dispatchCriticalError = (error): void => {
+const dispatchCriticalError = (error: string): void => {
     logError("ERROR: " + error);
     for (let i = 0, maxi = connectionErrorCallbacks.length; i < maxi; i++) {
         try {
