@@ -1,7 +1,7 @@
 import {sendChannelMessage} from './core';
 import ChannelInterface from "./channel-interface";
 
-import {MessageHandlerFunction, MonitorHandlerFunction} from "./defs";
+import {ChannelMessageCallback, ChannelMonitorCallback} from "./defs";
 
 export default class Channel {
 
@@ -13,12 +13,12 @@ export default class Channel {
     /**
      * Collection of callbacks, indexed by the message they respond to
      */
-    private messageCallbacks: { [message: string]: MessageHandlerFunction[] } = {};
+    private messageCallbacks: { [message: string]: ChannelMessageCallback[] } = {};
 
     /**
      * Callbacks that will receive any message
      */
-    private monitorCallbacks: MonitorHandlerFunction[] = [];
+    private monitorCallbacks: ChannelMonitorCallback[] = [];
 
     /**
      * The public interface that will be passed back to the calling page
@@ -83,7 +83,7 @@ export default class Channel {
     /**
      * Register a handler to react to a particular message
      */
-    registerMessageHandler(message: string, handler: MessageHandlerFunction): void {
+    registerMessageHandler(message: string, handler: ChannelMessageCallback): void {
         if (!(message in this.messageCallbacks)) this.messageCallbacks[message] = [];
         this.messageCallbacks[message].push(handler);
     }
@@ -91,7 +91,7 @@ export default class Channel {
     /**
      * Register a new handler to see ALL communication
      */
-    registerMonitorHandler(handler: MonitorHandlerFunction): void {
+    registerMonitorHandler(handler: ChannelMonitorCallback): void {
         this.monitorCallbacks.push(handler);
     }
 

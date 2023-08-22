@@ -2,7 +2,13 @@ import Connection from "./connection";
 import ConnectionFaker from "./connection-faker";
 import ConnectionWebSocket from "./connection-websocket";
 import Channel from "./channel";
-import {ConnectionStates, CoreOptions} from "./defs";
+import {
+    ConnectionErrorCallback,
+    ConnectionStates,
+    ConnectionStatusCallback,
+    CoreOptions,
+    PlayerChangedCallback
+} from "./defs";
 
 /**
  * Message in the form MSG<Channel>,<Message>,<Data>
@@ -42,17 +48,17 @@ let playerName: string | null = null;
 /**
  * Callbacks to be notified when the player gets changed
  */
-let playerChangedHandlers: Function[] = [];
+let playerChangedCallbacks: PlayerChangedCallback[] = [];
 
 /**
  * Callbacks to be notified when the connection status gets changed
  */
-let statusChangedHandlers: Function[] = [];
+let connectionStatusChangedCallbacks: ConnectionStatusCallback[] = [];
 
 /**
  * Callbacks to be notified when something goes wrong
  */
-let errorHandlers: Function[] = [];
+let connectionErrorCallbacks: ConnectionErrorCallback[] = [];
 
 /**
  * Timeout mostly used to ensure we don't have multiple connection attempts
@@ -233,37 +239,37 @@ const stopConnection = () => {
  * Register a callback to be notified when the active player changes
  * Will be called with (playerDbref, playerName).
  */
-export const onPlayerChanged = (callback) => {
-    playerChangedHandlers.push(callback);
+export const onPlayerChanged = (callback: PlayerChangedCallback) => {
+    playerChangedCallbacks.push(callback);
 }
 
 /**
  * Register a callback to be notified when there's an error
  */
-export const onError = (callback) => {
-    errorHandlers.push(callback);
+export const onError = (callback: ConnectionErrorCallback) => {
+    connectionErrorCallbacks.push(callback);
 }
 
 /**
  * Registers a new callback that'll be informed of changes to the connection status.
  * The passed callback will immediately be called with the present status too.
  */
-export const onStatusChanged = (callback): void => {
-    statusChangedHandlers.push(callback);
+export const onStatusChanged = (callback: ConnectionStatusCallback): void => {
+    connectionStatusChangedCallbacks.push(callback);
     callback(connectionStatus);
 }
 
 /**
  * Called by present connection
  */
-export const updateAndDispatchPlayer = (newDbref, newName): void => {
+export const updateAndDispatchPlayer = (newDbref: number | null, newName: string | null): void => {
     if (playerDbref === newDbref && playerName === newName) return;
     playerDbref = newDbref;
     playerName = newName;
     logDebug("Player changed: " + newName + '(' + newDbref + ')');
-    for (let i = 0, maxi = playerChangedHandlers.length; i < maxi; i++) {
+    for (let i = 0, maxi = playerChangedCallbacks.length; i < maxi; i++) {
         try {
-            playerChangedHandlers[i](newDbref, newName);
+            playerChangedCallbacks[i](newDbref, newName);
         } catch (e) {
         }
     }
@@ -289,9 +295,9 @@ export const updateAndDispatchStatus = (newStatus: ConnectionStates): void => {
     }
 
     //Callbacks
-    for (let i = 0, maxi = statusChangedHandlers.length; i < maxi; i++) {
+    for (let i = 0, maxi = connectionStatusChangedCallbacks.length; i < maxi; i++) {
         try {
-            statusChangedHandlers[i](newStatus);
+            connectionStatusChangedCallbacks[i](newStatus);
         } catch (e) {
         }
     }
@@ -302,9 +308,9 @@ export const updateAndDispatchStatus = (newStatus: ConnectionStates): void => {
  */
 const dispatchCriticalError = (error): void => {
     logError("ERROR: " + error);
-    for (let i = 0, maxi = errorHandlers.length; i < maxi; i++) {
+    for (let i = 0, maxi = connectionErrorCallbacks.length; i < maxi; i++) {
         try {
-            errorHandlers[i](error);
+            connectionErrorCallbacks[i](error);
         } catch (e) {
         }
     }

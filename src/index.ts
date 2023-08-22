@@ -7,7 +7,7 @@ import {init, setDebug, onPlayerChanged, onError, onStatusChanged} from "./core"
  * @borrows onError as onError
  * @borrows onStatusChanged as onStatusChanged
  */
-const websocket = {
+const library = {
     init: init,
     setDebug: setDebug,
     onPlayerChanged: onPlayerChanged,
@@ -15,4 +15,4 @@ const websocket = {
     onStatusChanged: onStatusChanged
 }
 
-export default websocket
+export default library

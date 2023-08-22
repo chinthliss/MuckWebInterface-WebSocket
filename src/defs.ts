@@ -11,10 +11,22 @@ export interface CoreOptions {
     authenticationUrl?: string;
 }
 
-export type MessageHandlerFunction = (
+export type ChannelMessageCallback = (
     (data: any) => void
-    )
+)
 
-export type MonitorHandlerFunction = (
+export type ChannelMonitorCallback = (
     (message: string, data: any, outgoing: boolean) => void
-    )
+)
+
+export type ConnectionStatusCallback = (
+    (status: ConnectionStates) => void
+)
+
+export type ConnectionErrorCallback = (
+    (error: string) => void
+)
+
+export type PlayerChangedCallback = (
+    (playerDbref: number | null, playerName: string | null) => void
+)

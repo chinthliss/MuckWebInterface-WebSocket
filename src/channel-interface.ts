@@ -1,5 +1,5 @@
 import Channel from "./channel";
-import {MessageHandlerFunction, MonitorHandlerFunction} from './defs';
+import {ChannelMessageCallback, ChannelMonitorCallback} from './defs';
 
 /**
  * The parts of a channel that will be exposed to a program using this library
@@ -36,7 +36,7 @@ export default class ChannelInterface {
      * Used to register callbacks for when a given message arrives via this channel.
      * The given callback will receive whatever data the muck sends
      */
-    on(message: string, callback: MessageHandlerFunction) {
+    on(message: string, callback: ChannelMessageCallback) {
         if (!message || !callback) throw "Invalid Arguments";
         this.channel.registerMessageHandler(message, callback);
     }
@@ -45,7 +45,7 @@ export default class ChannelInterface {
      * Called on ANY message, mostly intended to monitor a channel in development
      * The given callback will receive (message, data, outgoing?)
      */
-    any(callback: MonitorHandlerFunction) {
+    any(callback: ChannelMonitorCallback) {
         if (!callback) throw "Invalid Arguments";
         this.channel.registerMonitorHandler(callback);
     }
