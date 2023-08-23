@@ -373,7 +373,7 @@ export const onError = (callback: ConnectionErrorCallback) => {
  * Registers a new callback that'll be informed of changes to the connection status.
  * The passed callback will immediately be called with the present status too.
  */
-export const onStatusChanged = (callback: ConnectionStatusCallback): void => {
+export const onConnectionStatusChanged = (callback: ConnectionStatusCallback): void => {
     connectionStatusChangedCallbacks.push(callback);
     callback(connectionStatus);
 }
