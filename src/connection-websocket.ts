@@ -7,7 +7,7 @@ import {
     handleConnectionSuccess,
     receivedStringFromConnection
 } from "./core";
-import {ConnectionStates} from "./defs";
+import {ConnectionState} from "./defs";
 import Connection from "./connection";
 import axios, {AxiosInstance} from "axios";
 
@@ -121,7 +121,7 @@ export default class ConnectionWebSocket extends Connection {
 
     private openWebsocket(websocketToken: string) {
         logDebug("Opening websocket");
-        updateAndDispatchStatus(ConnectionStates.connecting);
+        updateAndDispatchStatus(ConnectionState.connecting);
 
         this.connection = new WebSocket(this.websocketUrl, 'mwi');
         this.connection.onopen = () => {
@@ -165,7 +165,7 @@ export default class ConnectionWebSocket extends Connection {
                     // Switch the message handler to the proper one
                     this.connection.onmessage = this.handleWebSocketMessage;
                     handleConnectionSuccess();
-                    updateAndDispatchStatus(ConnectionStates.connected);
+                    updateAndDispatchStatus(ConnectionState.connected);
                     updateAndDispatchPlayer(playerDbref, playerName);
                     //Resend anything that was buffered
                     for (let i = 0; i++; i < this.connectingOutgoingMessageBuffer.length) {

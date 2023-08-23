@@ -6,8 +6,8 @@ import ChannelInterface from "./channel-interface";
 import {
     InitialMode,
     ConnectionErrorCallback,
-    ConnectionStates,
-    ConnectionStatusCallback,
+    ConnectionState,
+    ConnectionStateChangedCallback,
     CoreOptions,
     PlayerChangedCallback
 } from "./defs";
@@ -35,7 +35,7 @@ let localStorageAvailable: boolean = false;
 /**
  * Present connection status
  */
-let connectionStatus: ConnectionStates = ConnectionStates.disconnected;
+let connectionState: ConnectionState = ConnectionState.disconnected;
 
 /**
  * Present player's database reference or null
@@ -55,7 +55,7 @@ let playerChangedCallbacks: PlayerChangedCallback[] = [];
 /**
  * Callbacks to be notified when the connection status gets changed
  */
-let connectionStatusChangedCallbacks: ConnectionStatusCallback[] = [];
+let connectionStateChangedCallbacks: ConnectionStateChangedCallback[] = [];
 
 /**
  * Callbacks to be notified when something goes wrong
@@ -310,7 +310,7 @@ const startConnection = () => {
     }
     logDebug("Starting connection.");
     clearConnectionTimeout();
-    updateAndDispatchStatus(ConnectionStates.connecting);
+    updateAndDispatchStatus(ConnectionState.connecting);
     updateAndDispatchPlayer(null, null);
     for (let channel in channels) {
         if (channels.hasOwnProperty(channel)) {
@@ -328,7 +328,7 @@ export const stopConnection = () => {
     if (!connection) return;
     logDebug("Stopping connection.");
     clearConnectionTimeout();
-    updateAndDispatchStatus(ConnectionStates.disabled);
+    updateAndDispatchStatus(ConnectionState.disabled);
     updateAndDispatchPlayer(null, null);
     for (let channel in channels) {
         if (channels.hasOwnProperty(channel)) {
@@ -348,7 +348,7 @@ export const channel = (channelName: string): ChannelInterface => {
     let newChannel: Channel = new Channel(channelName);
     channels[channelName] = newChannel;
     //Only send join request if we have a connection, as the connection process will also handle joins
-    if (connectionStatus === ConnectionStates.connected) sendSystemMessage('joinChannels', channelName);
+    if (connectionState === ConnectionState.connected) sendSystemMessage('joinChannels', channelName);
     return newChannel.interface;
 }
 
@@ -373,9 +373,9 @@ export const onError = (callback: ConnectionErrorCallback) => {
  * Registers a new callback that'll be informed of changes to the connection status.
  * The passed callback will immediately be called with the present status too.
  */
-export const onConnectionStatusChanged = (callback: ConnectionStatusCallback): void => {
-    connectionStatusChangedCallbacks.push(callback);
-    callback(connectionStatus);
+export const onConnectionStateChanged = (callback: ConnectionStateChangedCallback): void => {
+    connectionStateChangedCallbacks.push(callback);
+    callback(connectionState);
 }
 
 /**
@@ -397,13 +397,13 @@ export const updateAndDispatchPlayer = (newDbref: number | null, newName: string
 /**
  * Called by present connection
  */
-export const updateAndDispatchStatus = (newStatus: ConnectionStates): void => {
-    if (connectionStatus === newStatus) return;
-    logDebug('Connection status changed to ' + newStatus + ' (from ' + connectionStatus + ')');
-    connectionStatus = newStatus;
+export const updateAndDispatchStatus = (newStatus: ConnectionState): void => {
+    if (connectionState === newStatus) return;
+    logDebug('Connection status changed to ' + newStatus + ' (from ' + connectionState + ')');
+    connectionState = newStatus;
 
     // Maybe need to send channel join requests?
-    if (newStatus === ConnectionStates.connected) {
+    if (newStatus === ConnectionState.connected) {
         let channelsToJoin = [];
         for (let channel in channels) {
             if (channels.hasOwnProperty(channel) && !channels[channel].isChannelJoined()) {
@@ -414,9 +414,9 @@ export const updateAndDispatchStatus = (newStatus: ConnectionStates): void => {
     }
 
     //Callbacks
-    for (let i = 0, maxi = connectionStatusChangedCallbacks.length; i < maxi; i++) {
+    for (let i = 0, maxi = connectionStateChangedCallbacks.length; i < maxi; i++) {
         try {
-            connectionStatusChangedCallbacks[i](newStatus);
+            connectionStateChangedCallbacks[i](newStatus);
         } catch (e) {
         }
     }
@@ -463,8 +463,8 @@ export const isPlayerSet = (): boolean => {
  * Returns the present connection state.
  * One of: connecting, login, connected, failed
  */
-export const getConnectionState = (): ConnectionStates => {
-    return connectionStatus;
+export const getConnectionState = (): ConnectionState => {
+    return connectionState;
 }
 
 //endregion External functions for library specifically

@@ -1,5 +1,5 @@
 import {updateAndDispatchStatus, updateAndDispatchPlayer, receivedStringFromConnection} from "./core";
-import {ConnectionStates} from "./defs";
+import {ConnectionState} from "./defs";
 import Connection from "./connection";
 
 /**
@@ -12,7 +12,7 @@ export default class ConnectionFaker extends Connection {
     }
 
     connect(): void {
-        updateAndDispatchStatus(ConnectionStates.connected);
+        updateAndDispatchStatus(ConnectionState.connected);
         updateAndDispatchPlayer(1, 'TestPlayer');
     }
 

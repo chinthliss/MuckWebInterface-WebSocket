@@ -1,7 +1,7 @@
 // Pretty much just here so that it can be replaced if required
 export const InitialMode = import.meta.env.MODE;
 
-export enum ConnectionStates {
+export enum ConnectionState {
     disconnected = 'disconnected', // Only used before startup
     connecting = 'connecting',
     connected = 'connected',
@@ -23,8 +23,8 @@ export type ChannelMonitorCallback = (
     (message: string, data: any, outgoing: boolean) => void
 )
 
-export type ConnectionStatusCallback = (
-    (status: ConnectionStates) => void
+export type ConnectionStateChangedCallback = (
+    (status: ConnectionState) => void
 )
 
 export type ConnectionErrorCallback = (
