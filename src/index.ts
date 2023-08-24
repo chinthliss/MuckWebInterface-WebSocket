@@ -1,10 +1,10 @@
 import {
-    init,
+    start,
+    stop,
     setDebug,
     onPlayerChanged,
     onError,
     onConnectionStateChanged,
-    stopConnection,
     getPlayerDbref,
     getPlayerName,
     getConnectionState,
@@ -13,12 +13,12 @@ import {
 } from "./core";
 
 export default {
-    init: init,
+    start: start,
+    stop: stop,
     setDebug: setDebug,
     onPlayerChanged: onPlayerChanged,
     onError: onError,
     onConnectionStateChanged: onConnectionStateChanged,
-    shutdown: stopConnection,
     getPlayerDbref: getPlayerDbref,
     getPlayerName: getPlayerName,
     getConnectionState: getConnectionState,

@@ -1,15 +1,21 @@
-import {expect, test, vi, describe} from 'vitest';
+import {expect, test, vi, describe, afterEach} from 'vitest';
 
 import websocket from '../src/index.js';
 
 vi.useFakeTimers();
 
+afterEach(() => {
+    websocket.stop();
+    vi.runAllTimers();
+});
+
 describe("Core", () => {
-    test('Initializes successfully', () => {
-        expect(websocket.init).to.be.a('function');
-        const initSpy = vi.fn(websocket.init);
-        initSpy();
-        expect(initSpy).toHaveReturned();
+    test('Starts successfully', () => {
+
+        expect(websocket.start).to.be.a('function');
+        const startSpy = vi.fn(websocket.start);
+        startSpy();
+        expect(startSpy).toHaveReturned();
     });
 
     test('Allows registering an error callback', () => {
@@ -30,15 +36,26 @@ describe("Connection Status", () => {
 
     test("should have changed from 'disconnected' to 'connect'", () => {
         expect(websocket.getConnectionState()).to.equal('disconnected');
+        websocket.start();
         vi.runAllTimers();
         expect(websocket.getConnectionState()).to.equal('connected');
     });
 
-    test('Should throw an event with present status on registering', async () => {
+    test('Should throw an immediate event with present status on registering', async () => {
+        await websocket.onConnectionStateChanged((newStatus) => {
+            expect(newStatus).to.equal('disconnected');
+        });
+        vi.runAllTimers();
+    })
+
+    test('Should throw an event when connection status changes', async () => {
+        websocket.start();
+        vi.runAllTimers();
         await websocket.onConnectionStateChanged((newStatus) => {
             expect(newStatus).to.equal('connected');
         });
     })
+
 });
 
 describe('Player', function () {
@@ -50,13 +67,19 @@ describe('Player', function () {
         })).to.not.throw();
     });
 
-    test('Should be set to test values', () => {
+    test('Should be set to expected test values', () => {
+        websocket.start();
+        vi.runAllTimers();
         expect(websocket.getPlayerDbref()).to.equal(1);
         expect(websocket.getPlayerName()).to.equal('TestPlayer');
         expect(websocket.isPlayerSet()).to.equal(true);
     })
 
     test('Should throw an event for change', async () => {
+        expect(websocket.getPlayerName()).to.equal(null);
+        expect(websocket.getPlayerDbref()).to.equal(null);
+        websocket.start();
+        vi.runAllTimers();
         await websocket.onPlayerChanged((newDbref, newName) => {
             expect(newDbref).to.equal(1);
             expect(newName).to.equal('TestPlayer');
@@ -90,6 +113,14 @@ describe('Channels', function () {
         expect(() => {
             channel.send('reflect', 'data');
         }).to.not.throw();
+    })
+
+    test('Should be able to register a monitor callback', async() => {
+        const channel = websocket.channel('test');
+        channel.send('reflect', 'data')
+        await channel.any((message, data) => {
+            expect(data).to.equal('data');
+        });
     })
 
 });

@@ -2,13 +2,13 @@
 export const InitialMode = import.meta.env.MODE;
 
 export enum ConnectionState {
-    disconnected = 'disconnected', // Only used before startup
+    disconnected = 'disconnected', // Used before startup or after shutdown
+    queued = 'queued',
     connecting = 'connecting',
-    connected = 'connected',
-    disabled = 'disabled' // For when no more attempts will happen
+    connected = 'connected'
 }
 
-export interface CoreOptions {
+export interface ConnectionOptions {
     environment?: string;
     websocketUrl?: string;
     authenticationUrl?: string;

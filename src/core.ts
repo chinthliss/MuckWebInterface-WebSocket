@@ -8,7 +8,7 @@ import {
     ConnectionErrorCallback,
     ConnectionState,
     ConnectionStateChangedCallback,
-    CoreOptions,
+    ConnectionOptions,
     PlayerChangedCallback
 } from "./defs";
 
@@ -23,9 +23,9 @@ const msgRegExp: RegExp = /MSG(.*?),(.*?),(.*)/;
 const sysRegExp: RegExp = /SYS(.*?),(.*?),(.*)/;
 
 /**
- * Present mode we're operating in
+ * Present mode we're operating in.
  */
-let mode: string = "production";
+let mode: string = InitialMode;
 
 /**
  * Whether we can use local storage. Set in initialization.
@@ -78,7 +78,7 @@ let connectionFailures: number = 0;
 let debug: boolean = false;
 
 /**
- * Our presently configured connection object
+ * Our presently configured connection object. Only set if active.
  */
 let connection: Connection | null = null;
 
@@ -86,6 +86,16 @@ let connection: Connection | null = null;
  * A lookup list of registered channels
  */
 const channels: { [channelName: string]: Channel } = {};
+
+/**
+ * Default websocket url to use unless it's overridden
+ */
+let defaultWebsocketUrl: string = '';
+
+/**
+ * Default authentication url to use unless it's overridden.
+ */
+let defaultAuthenticationUrl: string = '';
 
 /**
  * Utility function to format errors
@@ -131,7 +141,7 @@ export const handleConnectionFailure = (errorMessage: string, fatal: boolean = f
     // Start again unless the problem was fatal
     if (fatal) {
         logError("Fatal Connection Error - cancelling any further attempt to connect.");
-        stopConnection();
+        stop();
     } else {
         queueConnection()
     }
@@ -239,59 +249,7 @@ const receivedChannelMessage = (channelName: string, message: string, data: any)
 }
 
 /**
- * Called by the hosting program to start everything up
- */
-export const init = (options: CoreOptions = {}): void => {
-
-    if (connection) {
-        logError("Attempt to run init() when initialisation has already taken place.");
-        return;
-    }
-
-    // Set Environment
-    mode = options?.environment || InitialMode || "production";
-    if (options.environment) mode = options.environment;
-
-    // Previously this was a test to find something in order of self, window, global
-    const context = globalThis;
-
-    // Figure out whether we have local storage (And load debug option if so)
-    localStorageAvailable = 'localStorage' in context;
-    if (localStorageAvailable && localStorage.getItem('mwiWebsocket-debug') === 'y') debug = true;
-    if (mode === 'localdevelopment') debug = true; // No local storage in this mode, so assuming
-
-    // Work out which connection we're using
-    if (mode === 'test' || options.useFaker) connection = new ConnectionFaker(options);
-    if (!connection) {
-        if ("WebSocket" in context) {
-            // Calculate where we're connecting to
-            if (context.location) {
-                if (!options.websocketUrl) options.websocketUrl =
-                    (location.protocol === 'https:' ? 'wss://' : 'ws://') // Ensure same level of security as page
-                    + location.hostname + "/mwi/ws";
-                if (!options.authenticationUrl) options.authenticationUrl = location.origin + '/getWebsocketToken';
-            }
-            connection = new ConnectionWebSocket(options);
-        }
-    }
-    if (!connection) throw "Failed to find any usable connection method";
-
-    logDebug("Initialized Websocket in environment: " + mode);
-
-    queueConnection();
-}
-
-/**
- * Used as entry point for both new connections and reconnects
- */
-const queueConnection = () => {
-    let delay: number = connectionFailures * 100;
-    queuedConnectionTimeout = setTimeout(startConnection, delay);
-    logDebug(`Connection attempt queued with a delay of ${delay}ms.`);
-}
-
-/**
- * Utility function to unset the connection timeout
+ * Utility function to unset any current connection timeout
  */
 const clearConnectionTimeout = () => {
     if (queuedConnectionTimeout) {
@@ -301,16 +259,17 @@ const clearConnectionTimeout = () => {
 }
 
 /**
- * Starts connection attempts to the configured connection
+ * Used as entry point for both new connections and reconnects
  */
-const startConnection = () => {
+const queueConnection = () => {
+    if (queuedConnectionTimeout) return; // Already queued
     if (!connection) {
-        logError("Attempt to start a connection when it hasn't been configured yet.");
-        throw "Attempt to start a connection when it hasn't been configured yet."
+        logError("Attempt to queue the next connection when no connection has been configured.");
+        throw "Attempt to queue the next connection when no connection has been configured.";
     }
-    logDebug("Starting connection.");
-    clearConnectionTimeout();
-    updateAndDispatchStatus(ConnectionState.connecting);
+    let delay: number = connectionFailures * 100;
+    queuedConnectionTimeout = setTimeout(connect, delay);
+    updateAndDispatchStatus(ConnectionState.queued);
     updateAndDispatchPlayer(null, null);
     for (let channel in channels) {
         if (channels.hasOwnProperty(channel)) {
@@ -318,17 +277,52 @@ const startConnection = () => {
             channels[channel].channelDisconnected();
         }
     }
-    connection.connect();
-};
+    logDebug(`Connection attempt queued with a delay of ${delay}ms.`);
+}
 
 /**
- * Shut down the connection completely. Will stop any further attempts to connect.
+ * Start a connection attempt on the currently configured connection
+ * This should only be run through queueConnection
  */
-export const stopConnection = () => {
-    if (!connection) return;
+const connect = () => {
+    if (!connection) {
+        logError("Attempt to start a connection when it hasn't been configured yet.");
+        throw "Attempt to start a connection when it hasn't been configured yet."
+    }
+    logDebug("Starting connection.");
+    updateAndDispatchStatus(ConnectionState.connecting);
+    connection.connect();
+}
+
+/**
+ * Create and start a new connection which the library will attempt to keep open.
+ */
+export const start = (options: ConnectionOptions = {}): void => {
+    if (connection) {
+        logDebug("Attempt to start the connection when it's already been started.");
+        return;
+    }
+    if (!(options.websocketUrl)) options.websocketUrl = defaultWebsocketUrl;
+    if (!(options.authenticationUrl)) options.authenticationUrl = defaultAuthenticationUrl;
+
+    if (mode === 'test' || options.useFaker)
+        connection = new ConnectionFaker(options);
+    else
+        connection = new ConnectionWebSocket(options)
+    queueConnection();
+}
+
+/**
+ * Shut down and delete the connection completely. Will stop any further attempts to connect.
+ */
+export const stop = () => {
+    if (!connection) {
+        logDebug("Attempt to stop a connection when there isn't one.");
+        return;
+    }
     logDebug("Stopping connection.");
     clearConnectionTimeout();
-    updateAndDispatchStatus(ConnectionState.disabled);
+    updateAndDispatchStatus(ConnectionState.disconnected);
     updateAndDispatchPlayer(null, null);
     for (let channel in channels) {
         if (channels.hasOwnProperty(channel)) {
@@ -337,6 +331,7 @@ export const stopConnection = () => {
         }
     }
     connection.disconnect();
+    connection = null;
 }
 
 /**
@@ -468,3 +463,23 @@ export const getConnectionState = (): ConnectionState => {
 }
 
 //endregion External functions for library specifically
+
+//region Initialization
+
+// Previously this was a test to find something in order of self, window, global
+const context = globalThis;
+
+// Figure out whether we have local storage (And load debug option if so)
+localStorageAvailable = 'localStorage' in context;
+if (localStorageAvailable && localStorage.getItem('mwiWebsocket-debug') === 'y') debug = true;
+
+// Set default URLs
+if (context.location) {
+    defaultWebsocketUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') // Ensure same level of security as page
+        + location.hostname + "/mwi/ws";
+    defaultAuthenticationUrl = location.origin + '/getWebsocketToken';
+}
+
+logDebug("Initialization complete.")
+
+//endregion Initialization
