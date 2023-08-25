@@ -3,7 +3,7 @@ The underlying code will handle the actual connection but it doesn't connect by 
 Once imported and set to a global, assumed to be mwiWebsocket here, use:
 
 ```
-mwiWebsocket.init();
+mwiWebsocket.start();
 ```
 
 # Channels
