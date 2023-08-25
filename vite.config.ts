@@ -29,6 +29,7 @@ export default defineConfig({
         include: [resolve(__dirname, 'test/*.ts')]
     },
     server: {
+        port: 5175,
         watch: {
             usePolling: true
         }
