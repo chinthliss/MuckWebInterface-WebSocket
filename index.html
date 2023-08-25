@@ -5,19 +5,38 @@
     <title>Test</title>
 </head>
 <body>
-This page just loads the library to test it. Check the console.
+<p>This page just loads the library to test it. Check the console for further information / messages.</p>
+<div>
+    Connection Status: <span id="ConnectionStatus">Starting up..</span>
+</div>
+<div>
+    Player Dbref: <span id="PlayerDbref"></span>
+</div>
+<div>
+    Player Name: <span id="PlayerName"></span>
+</div>
 </body>
 </html>
 <script type="module">
     import websocket from "/src/index.ts";
-
-    window.mwiWebsocket = websocket;
 
     const options = {
         //websocketUrl: "wss://mwi.flexiblesurvival.com/mwi/ws",
         //authenticationUrl: "http://homestead.test/getWebsocketToken",
         useFaker: true
     }
+
+    window.mwiWebsocket = websocket;
+
+    websocket.onConnectionStateChanged((newStatus) => {
+        document.getElementById('ConnectionStatus').textContent = newStatus;
+    });
+
+    websocket.onPlayerChanged((newPlayerDbref, newPlayerName) => {
+        document.getElementById('PlayerDbref').textContent = newPlayerDbref;
+        document.getElementById('PlayerName').textContent = newPlayerName;
+    });
+
     websocket.start(options);
 
 </script>

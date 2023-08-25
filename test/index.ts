@@ -1,6 +1,6 @@
 import {expect, test, vi, describe, afterEach} from 'vitest';
 
-import websocket from '../src/index.js';
+import websocket, {ConnectionState} from '../src/index.js';
 
 vi.useFakeTimers();
 
@@ -11,11 +11,17 @@ afterEach(() => {
 
 describe("Core", () => {
     test('Starts successfully', () => {
-
         expect(websocket.start).to.be.a('function');
         const startSpy = vi.fn(websocket.start);
         startSpy();
         expect(startSpy).toHaveReturned();
+    });
+
+    test('Stops successfully', () => {
+        websocket.start();
+        websocket.stop();
+        vi.runAllTimers();
+        expect (websocket.getConnectionState()).to.equal(ConnectionState.disconnected);
     });
 
     test('Allows registering an error callback', () => {
@@ -34,16 +40,16 @@ describe("Connection Status", () => {
         })).to.not.throw();
     });
 
-    test("should have changed from 'disconnected' to 'connect'", () => {
-        expect(websocket.getConnectionState()).to.equal('disconnected');
+    test("should have changed from 'disconnected' to 'connected'", () => {
+        expect(websocket.getConnectionState()).to.equal(ConnectionState.disconnected);
         websocket.start();
         vi.runAllTimers();
-        expect(websocket.getConnectionState()).to.equal('connected');
+        expect(websocket.getConnectionState()).to.equal(ConnectionState.connected);
     });
 
     test('Should throw an immediate event with present status on registering', async () => {
         await websocket.onConnectionStateChanged((newStatus) => {
-            expect(newStatus).to.equal('disconnected');
+            expect(newStatus).to.equal(ConnectionState.disconnected);
         });
         vi.runAllTimers();
     })
@@ -52,7 +58,7 @@ describe("Connection Status", () => {
         websocket.start();
         vi.runAllTimers();
         await websocket.onConnectionStateChanged((newStatus) => {
-            expect(newStatus).to.equal('connected');
+            expect(newStatus).to.equal(ConnectionState.connected);
         });
     })
 
