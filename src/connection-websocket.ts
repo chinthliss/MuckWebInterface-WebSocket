@@ -9,7 +9,7 @@ import {
 } from "./core";
 import {ConnectionState} from "./defs";
 import Connection from "./connection";
-import axios, {AxiosInstance} from "axios";
+import axios, {AxiosError, AxiosInstance, AxiosResponse} from "axios";
 
 export interface ConnectionWebsocketOptions {
     websocketUrl?: string;
@@ -96,7 +96,9 @@ export default class ConnectionWebSocket extends Connection {
      */
     private handleWebSocketClose = (e: CloseEvent) => {
         logDebug("WebSocket closed: " + (e.reason ? e.reason : 'No reason given.'));
-        this.cleanupAndReportConnectionFailure("Websocket closed with " + (e.reason ? "reason: " + e.reason : "no reason given."));
+        this.cleanupAndReportConnectionFailure(
+            "Websocket closed with " + (e.reason ? "reason: " + e.reason : "no reason given."), false
+        );
     };
 
     /**
@@ -117,8 +119,6 @@ export default class ConnectionWebSocket extends Connection {
         receivedStringFromConnection(message);
     }
 
-
-
     private openWebsocket(websocketToken: string) {
         logDebug("Opening websocket");
         updateAndDispatchStatus(ConnectionState.connecting);
@@ -130,7 +130,7 @@ export default class ConnectionWebSocket extends Connection {
             this.connectingOutgoingMessageBuffer = [];
             this.handshakeTimeout = setTimeout(() => {
                 logError('WebSocket took too long to complete handshake, assuming failure.');
-                this.cleanupAndReportConnectionFailure("Websocket took too long to connect.");
+                this.cleanupAndReportConnectionFailure("Websocket took too long to connect.", false);
             }, 10000);
         };
 
@@ -175,7 +175,7 @@ export default class ConnectionWebSocket extends Connection {
                     return;
                 }
                 if (message === 'invalidtoken') {
-                    this.cleanupAndReportConnectionFailure("Server refused authentication token.");
+                    this.cleanupAndReportConnectionFailure("Server refused authentication token.", true);
                     return;
                 }
                 logError("WebSocket got an unexpected message whilst expecting descr: " + message);
@@ -199,21 +199,24 @@ export default class ConnectionWebSocket extends Connection {
         let websocketToken: string;
         logDebug("Requesting authentication token from webpage");
         this.axiosInstance.get(this.authenticationUrl)
-            .then((response) => {
+            .then((response: AxiosResponse) => {
                 websocketToken = response.data;
                 //Step 2 - connect to the websocket and throw the token at it
                 this.openWebsocket(websocketToken);
             })
-            .catch((error) => {
-                logError("Failed to get an authentication token from the webpage. Error was:" + error);
-                this.cleanupAndReportConnectionFailure("Couldn't authenticate");
+            .catch((error: AxiosError) => {
+                // This is fatal if we actually managed to connect to the server and it refused us
+                const isFatal: boolean = error.response !== undefined && error.response.status === 403;
+                logError("Failed to get an authentication token from the webpage. Error was: " + error.message);
+                if (isFatal) logError("Furthermore, the webpage forbid us from retrying.");
+                this.cleanupAndReportConnectionFailure("Couldn't authenticate", isFatal);
             });
     }
 
     /**
      * Disconnects the websocket and tidies it up
      */
-    disconnect():void {
+    disconnect(): void {
         this.clearHandshakeTimeoutIfSet();
         // The websocket's close connection callback will log this
         // logDebug(this.connection !== null ? "Closing websocket." : "No websocket to close.");
@@ -224,15 +227,15 @@ export default class ConnectionWebSocket extends Connection {
     /**
      * Internal utility function to disconnect before passing an error back to core
      */
-    private cleanupAndReportConnectionFailure(error: string): void {
+    private cleanupAndReportConnectionFailure(error: string, isFatal: boolean): void {
         if (this.connection) this.disconnect();
-        handleConnectionFailure(error);
+        handleConnectionFailure(error, isFatal);
     }
 
     /**
      * Send a string over the websocket
      */
-    sendString(stringToSend: string):void {
+    sendString(stringToSend: string): void {
         if (!this.connection) {
             logDebug("Couldn't send message (and not buffering) due to being in an unconnected state: " + stringToSend);
             return;

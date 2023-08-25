@@ -136,6 +136,7 @@ export const setDebug = (trueOrFalse: boolean): void => {
  * Called by the connection. If the fault wasn't fatal, a reconnect is queued
  */
 export const handleConnectionFailure = (errorMessage: string, fatal: boolean = false): void => {
+    clearConnectionTimeout(); // If the connection failed, it definitely isn't pending
     connectionFailures++;
     dispatchError(errorMessage);
     // Start again unless the problem was fatal
@@ -253,6 +254,7 @@ const receivedChannelMessage = (channelName: string, message: string, data: any)
  */
 const clearConnectionTimeout = () => {
     if (queuedConnectionTimeout) {
+        console.log("Cancelling queued connection timeout");
         clearTimeout(queuedConnectionTimeout);
         queuedConnectionTimeout = null;
     }
@@ -267,7 +269,7 @@ const queueConnection = () => {
         logError("Attempt to queue the next connection when no connection has been configured.");
         throw "Attempt to queue the next connection when no connection has been configured.";
     }
-    let delay: number = connectionFailures * 100;
+    let delay: number = Math.min(connectionFailures * 100, 60000);
     queuedConnectionTimeout = setTimeout(connect, delay);
     updateAndDispatchStatus(ConnectionState.queued);
     updateAndDispatchPlayer(null, null);
@@ -418,10 +420,10 @@ export const updateAndDispatchStatus = (newStatus: ConnectionState): void => {
 };
 
 /**
- * Called when there's an error
+ * Called when there's an error we also want to send onto users of the library
  */
 const dispatchError = (error: string): void => {
-    logError("ERROR: " + error);
+    logError("(dispatched) " + error);
     for (let i = 0, maxi = connectionErrorCallbacks.length; i < maxi; i++) {
         try {
             connectionErrorCallbacks[i](error);
