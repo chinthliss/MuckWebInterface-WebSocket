@@ -19,7 +19,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "install": "vite build"
+    "prepare": "vite build"
   },
   "devDependencies": {
     "typescript": "^5.1.6",
