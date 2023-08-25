@@ -1,3 +1,4 @@
+// Main export is the library
 import {
     start,
     stop,
@@ -25,3 +26,26 @@ export default {
     isPlayerSet: isPlayerSet,
     channel: channel
 }
+
+// But also export definitions
+import {
+    ConnectionState,
+    ConnectionErrorCallback,
+    ChannelMessageCallback,
+    ChannelMonitorCallback,
+    ConnectionStateChangedCallback,
+    PlayerChangedCallback,
+    ConnectionOptions
+} from "./defs";
+
+export {
+    ConnectionState
+};
+export type {
+    ConnectionErrorCallback,
+    ChannelMessageCallback,
+    ChannelMonitorCallback,
+    ConnectionStateChangedCallback,
+    PlayerChangedCallback,
+    ConnectionOptions
+};

@@ -12,16 +12,16 @@ export default defineConfig({
         },
         copyPublicDir: false,
         rollupOptions: {
-            // make sure to externalize deps that shouldn't be bundled
-            // into your library
+            // Dependencies that shouldn't be bundled
             external: ['axios'],
             output: {
-                // Provide global variables to use in the UMD build
-                // for externalized deps
+                // For UMD - expected globals
                 globals: {
                     axios: 'axios',
                 },
-            },
+                // Flag that we're using the default export and then some extra ones
+                exports: 'named'
+            }
         }
     },
     plugins: [dts()],
