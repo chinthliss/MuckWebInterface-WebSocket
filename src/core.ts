@@ -139,6 +139,7 @@ export const handleConnectionFailure = (errorMessage: string, fatal: boolean = f
     clearConnectionTimeout(); // If the connection failed, it definitely isn't pending
     connectionFailures++;
     dispatchError(errorMessage);
+    if (!connection) return; // Connection has already stopped
     // Start again unless the problem was fatal
     if (fatal) {
         logError("Fatal Connection Error - cancelling any further attempt to connect.");
@@ -254,7 +255,7 @@ const receivedChannelMessage = (channelName: string, message: string, data: any)
  */
 const clearConnectionTimeout = () => {
     if (queuedConnectionTimeout) {
-        console.log("Cancelling queued connection timeout");
+        logDebug("Cancelling queued connection timeout");
         clearTimeout(queuedConnectionTimeout);
         queuedConnectionTimeout = null;
     }
