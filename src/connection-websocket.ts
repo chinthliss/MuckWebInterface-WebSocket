@@ -92,32 +92,32 @@ export default class ConnectionWebSocket extends Connection {
     };
 
     /**
-     * Called internally to handle connection closes from the websocket
+     * Callback for the websocket's event handler
      */
     private handleWebSocketClose = (e: CloseEvent) => {
         logDebug("WebSocket closed: " + (e.reason ? e.reason : 'No reason given.'));
-        console.log(e);
-        this.clearHandshakeTimeoutIfSet();
-        handleConnectionFailure("Websocket closed with " + (e.reason ? "reason: " + e.reason : "no reason given."));
+        this.cleanupAndReportConnectionFailure("Websocket closed with " + (e.reason ? "reason: " + e.reason : "no reason given."));
     };
 
     /**
-     * Called internally to handle errors from the websocket
+     * Callback for the websocket's event handler
      */
-    private handleWebSocketError = (e: Event) => {
-        logError('An error occurred with the websocket: ' + e)
-        console.log(e);
-        this.clearHandshakeTimeoutIfSet();
-        handleConnectionFailure("Websocket returned error: " + e);
+    private handleWebSocketError = () => {
+        // This can be passed an event but the websocket spec only passes a simple Event object with no further information.
+        logError("An error occurred with the websocket (which doesn't provide information)");
+        // Websocket spec says that an error will auto-close, so wait until said close event to avoid duplication
+        // this.cleanupAndReportConnectionFailure("Websocket returned error.");
     }
 
     /**
-     * Internal handler for capturing messages from the websocket
+     * Callback for the websocket's event handler
      */
     private handleWebSocketMessage = (e: MessageEvent) => {
         let message = e.data.slice(0, -2); //Remove \r\n
         receivedStringFromConnection(message);
     }
+
+
 
     private openWebsocket(websocketToken: string) {
         logDebug("Opening websocket");
@@ -128,10 +128,10 @@ export default class ConnectionWebSocket extends Connection {
             this.handshakeReceivedWelcome = false;
             this.handshakeCompleted = false;
             this.connectingOutgoingMessageBuffer = [];
-            this.handshakeTimeout = setTimeout(function () {
+            this.handshakeTimeout = setTimeout(() => {
                 logError('WebSocket took too long to complete handshake, assuming failure.');
-                handleConnectionFailure("Websocket took too long to connect.");
-            }.bind(this), 10000);
+                this.cleanupAndReportConnectionFailure("Websocket took too long to connect.");
+            }, 10000);
         };
 
         this.connection.onclose = this.handleWebSocketClose;
@@ -175,7 +175,7 @@ export default class ConnectionWebSocket extends Connection {
                     return;
                 }
                 if (message === 'invalidtoken') {
-                    handleConnectionFailure("Server refused authentication token.");
+                    this.cleanupAndReportConnectionFailure("Server refused authentication token.");
                     return;
                 }
                 logError("WebSocket got an unexpected message whilst expecting descr: " + message);
@@ -206,23 +206,33 @@ export default class ConnectionWebSocket extends Connection {
             })
             .catch((error) => {
                 logError("Failed to get an authentication token from the webpage. Error was:" + error);
-                handleConnectionFailure("Couldn't authenticate");
+                this.cleanupAndReportConnectionFailure("Couldn't authenticate");
             });
     }
 
     /**
      * Disconnects the websocket and tidies it up
      */
-    disconnect() {
-        logDebug(this.connection !== null ? "Closing websocket." : "No websocket to close.");
+    disconnect():void {
+        this.clearHandshakeTimeoutIfSet();
+        // The websocket's close connection callback will log this
+        // logDebug(this.connection !== null ? "Closing websocket." : "No websocket to close.");
         if (this.connection !== null) this.connection.close(1000, "Disconnected");
         this.connection = null;
     }
 
     /**
+     * Internal utility function to disconnect before passing an error back to core
+     */
+    private cleanupAndReportConnectionFailure(error: string): void {
+        if (this.connection) this.disconnect();
+        handleConnectionFailure(error);
+    }
+
+    /**
      * Send a string over the websocket
      */
-    sendString(stringToSend: string) {
+    sendString(stringToSend: string):void {
         if (!this.connection) {
             logDebug("Couldn't send message (and not buffering) due to being in an unconnected state: " + stringToSend);
             return;
