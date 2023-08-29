@@ -1,6 +1,11 @@
-The underlying code will handle the actual connection but it doesn't connect by default.
+The default export from the library will provide a reference. For the purposes of documentation, this is assumed to have been done by something like:
 
-Once imported and set to a global, assumed to be mwiWebsocket here, use:
+```
+import MwiWebsocketLibrary from 'muckwebinterface-websocket'
+window.mwiWebsocket = MwiWebsocketLibrary; 
+```
+
+The underlying code will handle the actual connection, but it doesn't connect by default and can be launched with:
 
 ```
 mwiWebsocket.start();
@@ -8,7 +13,7 @@ mwiWebsocket.start();
 
 # Channels
 
-A page using it needs to join channels they intend to use on that particular page.
+A page using it needs to join channels that they intend to use on that particular page.
 ```
 const myChannel = mwiWebsocket.channel('channelname');
 ```

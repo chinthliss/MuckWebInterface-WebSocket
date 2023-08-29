@@ -32,11 +32,11 @@ Following on from such - for the intents of this documentation the underlying so
 ### Messages
 Communication is sent in the form of a short code prefixing the line. Message formats used:
 
-|Message|Content|
-|-------|-------|
-| MSGChannel,Message,Data|Standard message sent over a channel. Data is JSON encoded |
-| SYSMessage,Data|System messages without a channel. |
-| Ping / Pong|Handled at the transport level |
+| Message                 | Content                                                    |
+|-------------------------|------------------------------------------------------------|
+| MSGChannel,Message,Data | Standard message sent over a channel. Data is JSON encoded |
+| SYSMessage,Data         | System messages without a channel.                         |
+| Ping / Pong             | Handled at the transport level                             |
 
 ## Further Reading
   
