@@ -124,7 +124,7 @@ describe('Channels', function () {
     test('Should be able to register a monitor callback', async() => {
         const channel = websocket.channel('test');
         channel.send('reflect', 'data')
-        await channel.any((message, data) => {
+        await channel.any((_message, data) => {
             expect(data).to.equal('data');
         });
     })

@@ -53,7 +53,7 @@ export default class ChannelInterface {
     /**
      * Sends a message via this channel
      */
-    send(message: string, data: any) {
+    send(message: string, data: any = null) {
         if (!message) throw "Send called without a text message";
         this.channel.sendMessage(message, data);
     }
