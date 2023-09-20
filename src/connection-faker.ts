@@ -28,7 +28,7 @@ export default class ConnectionFaker extends Connection {
             data = JSON.parse(data);
             //Respond to join requests as if joined
             if (message === 'joinChannels') {
-                setTimeout(() => receivedStringFromConnection('MSG' + data + ',connected,1'));
+                setTimeout(() => receivedStringFromConnection('SYSjoinedChannel,' + JSON.stringify(data)));
 
             }
         }
@@ -39,7 +39,7 @@ export default class ConnectionFaker extends Connection {
             data = JSON.parse(data);
             //Reflect anything that has 'reflect' as the message
             if (message === 'reflect') {
-                setTimeout(() => receivedStringFromConnection('MSG' + channel + ',reflected,' + data));
+                setTimeout(() => receivedStringFromConnection('MSG' + channel + ',reflected,' + JSON.stringify(data)));
             }
         }
     }

@@ -20,7 +20,7 @@ const msgRegExp: RegExp = /MSG(.*?),(.*?),(.*)/;
 /**
  * System message in the form SYS<Message>,<Data>
  */
-const sysRegExp: RegExp = /SYS(.*?),(.*?),(.*)/;
+const sysRegExp: RegExp = /SYS(.*?),(.*)/;
 
 /**
  * Present mode we're operating in.
@@ -168,7 +168,7 @@ export const receivedStringFromConnection = (stringReceived: string): void => {
         try {
             let dataAsJson: string | null;
             [, channel, message, dataAsJson] = stringReceived.match(msgRegExp) || [null, '', '', null];
-            data = (dataAsJson ? null : JSON.parse(<string>dataAsJson));
+            data = (dataAsJson ? JSON.parse(<string>dataAsJson) : null);
         } catch (e) {
             logError("Failed to parse string as incoming channel message: " + stringReceived);
             console.log(e);
@@ -187,7 +187,7 @@ export const receivedStringFromConnection = (stringReceived: string): void => {
         try {
             let dataAsJson: string | null;
             [, message, dataAsJson] = stringReceived.match(sysRegExp) || [null, '', null];
-            data = (dataAsJson ? null : JSON.parse(<string>dataAsJson));
+            data = (dataAsJson ? JSON.parse(<string>dataAsJson) : null);
         } catch (e) {
             logError("Failed to parse string as incoming system message: " + stringReceived);
             return;
@@ -226,8 +226,10 @@ const sendSystemMessage = (message: string, data: any): void => {
 }
 
 const receivedSystemMessage = (message: string, data: any): void => {
+    console.log(message);
+    console.log("Data: ", data);
     switch (message) {
-        case 'channel':
+        case 'joinedChannel':
             // Let the channel know it's joined, so it can process buffered items
             if (data in channels) channels[data].channelConnected();
             else logError("Muck acknowledged joining a channel we weren't aware of! Channel: " + data);
