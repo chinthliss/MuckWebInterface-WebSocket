@@ -111,7 +111,24 @@ describe('Channels', function () {
         }).to.not.throw();
     })
 
+    test('Should be able to send a message with data', () => {
+        const channel = websocket.channel('test');
+        expect(() => {
+            channel.send('out', 1234);
+        }).to.not.throw();
+    })
+
     test('Should be able to receive a message', async () => {
+        const channel = websocket.channel('test');
+        await channel.on('reflected', (data) => {
+            expect(data).to.equal(null);
+        });
+        expect(() => {
+            channel.send('reflect');
+        }).to.not.throw();
+    })
+
+    test('Should be able to receive a message with data', async () => {
         const channel = websocket.channel('test');
         await channel.on('reflected', (data) => {
             expect(data).to.equal('data');
