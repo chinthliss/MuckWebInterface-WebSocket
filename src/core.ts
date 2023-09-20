@@ -226,8 +226,6 @@ const sendSystemMessage = (message: string, data: any): void => {
 }
 
 const receivedSystemMessage = (message: string, data: any): void => {
-    console.log(message);
-    console.log("Data: ", data);
     switch (message) {
         case 'joinedChannel':
             // Let the channel know it's joined, so it can process buffered items
