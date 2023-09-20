@@ -7,8 +7,8 @@ import Connection from "./connection";
  */
 export default class ConnectionFaker extends Connection {
 
-    constructor(options = {}) {
-        super(options);
+    constructor(_options: object = {}) {
+        super();
     }
 
     connect(): void {
@@ -21,11 +21,26 @@ export default class ConnectionFaker extends Connection {
     }
 
     sendString(stringToSend: string): void {
-        //Reflect anything that has 'reflect' as the message
-        let [channel, message, data] = stringToSend.split(',', 3);
-        if (message === 'reflect') {
+
+        if (stringToSend.startsWith('SYS')) {
+            let [message, data] = stringToSend.split(',', 2);
+            message = message.slice(3);
+            data = JSON.parse(data);
+            //Respond to join requests as if joined
+            if (message === 'joinChannels') {
+                setTimeout(() => receivedStringFromConnection('MSG' + data + ',connected,1'));
+
+            }
+        }
+
+        if (stringToSend.startsWith('MSG')) {
+            let [channel, message, data] = stringToSend.split(',', 3);
             channel = channel.slice(3);
-            receivedStringFromConnection('MSG' + channel + ',reflected,' + data);
+            data = JSON.parse(data);
+            //Reflect anything that has 'reflect' as the message
+            if (message === 'reflect') {
+                setTimeout(() => receivedStringFromConnection('MSG' + channel + ',reflected,' + data));
+            }
         }
     }
 
