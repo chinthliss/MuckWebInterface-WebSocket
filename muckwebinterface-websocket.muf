@@ -1,21 +1,21 @@
 @edit $www/mwi/websocket
 1 99999 d
 i
-
+ 
 (
 MuckWeb Interface (MWI) - Websockets
 https://github.com/chinthliss/MuckWebInterface-WebSocket
 This is the program to host the websocket used by the MWI webpage framework. It is NOT the websocket used by the direct connect client.
 The github project contains the full documentation. This program only contains relavant notes from the muck side.
-
+ 
 Assumes the muck takes time to re-use descrs, in particular that their is sufficient time to see a descr is disconnected before it is re-used.
-
+ 
 Underlying transmission code attempts to minimize the amount of encoding done by not doing it for every recipient
 Approximate transmission route:
 [Public send request functions through various SendToX methods]
 [Requests broken down into a list of descrs and the message, ending in sendMessageToDescrs]
 [Message is encoded appropriately once and sent to each websocket]
-
+ 
 The connection details stored in connections:
     descr: Descr for connection. The dictionary is also indexed by this.
     pid: PID of client process
@@ -28,24 +28,24 @@ The connection details stored in connections:
     ping: Last performance between ping sent and ping received
     lastPingOut: Systime_precise a pending ping was issued.
     lastPingIn: Systime_precise a pending ping was received
-
+ 
 Properties on program:
     debugLevel: Present debug level. Only read on load, as it's then cached due to constant use.
     @channels/<channel>/<programDbref>:<program creation date> - Programs to receive messages for a channel.
     @player/<some sort of reference>:<program> - Programs to receive wsConnect/wsDisconnect events based on player connection/disconnects
     disabled:If Y the system will prevent any connections
 )
-$version 1.0
-
+$version 1.1
+ 
 $include $lib/kta/strings
 $include $lib/kta/misc
 $include $lib/kta/proto
 $include $lib/kta/json
 $include $lib/account
 $include $lib/websocketIO
-
+ 
 $pubdef : (Clear present _defs)
-
+ 
 $libdef websocketIssueAuthenticationToken
 $libdef getConnections
 $libdef getCaches
@@ -65,21 +65,21 @@ $libdef sendToChannel
 $libdef sendToPlayer
 $libdef sendToPlayers
 $libdef sendToAccount
-
+ 
 $def allowCrossDomain 1        (Whether to allow cross-domain connections. This should only really be on during testing/development.)
 $def heartbeatTime 2           (How frequently the heartbeat event triggers)
 $def pingFrequency 5           (How often websocket connections are pinged)
 $def maxPingTime 12            (If a ping request isn't responded to in this amount of seconds the connection will be flagged as disconnected)
 $def maxAuthTime 30            (How long a request has to authenticate before being dropped)
 $def protocolVersion "1" (Only clients that meet such are allowed to connect)
-
+ 
 $ifdef is_dev
    $def allowCrossDomain 1
 $endif
-
+ 
 (If defined, the program will measure bandwidth, adding a small amoun of overhead to every input or output)
 $def trackBandwidth
-
+ 
 (Log levels:
    Error   - Always output
    Notice  - Always output, core things
@@ -91,19 +91,19 @@ $def debugLevelWarning 1
 $def debugLevelInfo 2
 $def debugLevelTrivial 3
 $def debugLevelAll 4
-
+ 
 (Rest of the logs are optional depending on if they're turned on and thus behind gates to save processing times)
 (For readibility the code between them should be indented)
 $def _startLogWarning debugLevel @ debugLevelWarning >= if
 $def _stopLogWarning " Warn" getLogPrefix swap strcat logstatus then
-
+ 
 $def _startLogInfo debugLevel @ debugLevelInfo >= if
 $def _stopLogInfo " Info" getLogPrefix swap strcat logstatus then
-
+ 
 $def _startLogDebug debugLevel @ debugLevelAll >= if
 $def _stopLogDebug "Debug" getLogPrefix swap strcat logstatus then
 $def _stopLogDebugMultiple foreach nip "Debug" getLogPrefix swap strcat logstatus repeat then
-
+ 
 svar connections (Main collection of connections, indexed by descr)
 svar cacheByChannel ( {channel:[descr..]} )
 svar cacheByPlayer ( {playerAsInt:[descr..]} )
@@ -111,38 +111,38 @@ svar cacheByAccount ( {accountAsInt:[descr..]} )
 svar serverProcess (PID of the server daemon)
 svar bandwidthCounts
 svar debugLevel (Loaded from disk on initialization but otherwise in memory to stop constant proprefs)
-
+ 
 : getLogPrefix (s -- s) (Outputs the log prefix for the given type)
     "[MWI-WS " swap 5 right strcat " " strcat pid serverProcess @ over = if pop "" else intostr then 8 right strcat "] " strcat
 ;
-
+ 
 : logError (s -- ) (Output definite problems)
     "ERROR" getLogPrefix swap strcat logstatus
 ;
-
+ 
 : logNotice (s -- ) (Output important notices)
     "-----" getLogPrefix swap strcat logstatus
 ;
-
+ 
 : getConnections ( -- arr) (Return the connection collection)
     connections @
 ; archcall getConnections
-
+ 
 : getCaches ( -- arr arr arr ) (Return the caches)
     cacheByChannel @
     cacheByPlayer @
     cacheByAccount @
 ; archcall getCaches
-
+ 
 : getDescrs ( -- arr) (Returns descrs the program is using, so other programs know they're reserved)
     { }list
     connections @ foreach pop swap array_appenditem repeat
 ; PUBLIC getDescrs
-
+ 
 : getBandwidthCounts ( -- arr)
     bandwidthCounts @
 ; archcall getBandwidthCounts
-
+ 
 (Record bandwidth in the relevant bucket.)
 : trackBandwidthCounts[ int:bytes str:bucket -- ]
     bandwidthCounts @ bucket @ array_getitem ?dup not if { }dict then
@@ -155,7 +155,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
     bytes @ + rot rot array_setitem
     bandwidthCounts @ bucket @ array_setitem bandwidthCounts !
 ;
-
+ 
   (Produces a string with the items in ConnectionDetails for logging and debugging)
 : connectionDetailsToString[ arr:details -- str:result ]
     details @ not if "[Invalid/Disconnected Connection]" exit then
@@ -165,12 +165,12 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         ", Player:" details @ "player" array_getitem ?dup not if "-UNSET-" else dup ok? if name else pop "-INVALID-" then then strcat strcat
     "]" strcat
 ;
-
+ 
   (Utility function - ideally call connectionDetailsToString instead.)
 : descrToString[ str:who -- str:result ]
     connections @ who @ array_getitem connectionDetailsToString
 ;
-
+ 
 : ensureInit
     (Ensures variables are configured and server daemon is running)
     connections @ dictionary? not if
@@ -190,7 +190,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         0 prog "ServerStartup" queue serverProcess ! (Need to set immediately to prevent loops)
     then
 ;
-
+ 
 : websocketIssueAuthenticationToken[ aid:account dbref?:character -- str:token ]
     systime_precise intostr "-" "." subst "-" strcat random 1000 % intostr base64encode strcat var! token
     prog "@tokens/" token @ strcat "/issued" strcat systime setprop
@@ -200,27 +200,27 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
     then
     token @
 ; wizcall websocketIssueAuthenticationToken
-
+ 
   (Check to see if a player is using the connection framework)
 : connectionsFromPlayer[ dbref:player -- int:connections ]
     player @ player? not if "Invalid Arguments" abort then
     cacheByPlayer @ player @ int array_getitem ?dup if array_count else 0 then
 ; PUBLIC connectionsFromPlayer
-
+ 
   (Check to see if a player is on the given channel)
 : playerUsingChannel?[ dbref:player str:channel -- int:bool ]
     cacheByPlayer @ player @ int array_getitem ?dup not if 0 exit then
     cacheByChannel @ channel @ array_getitem ?dup not if pop 0 exit then
     array_intersect array_count
 ; PUBLIC playerUsingChannel?
-
+ 
   (Check to see if an account is on the given channel)
 : accountUsingChannel?[ int:account str:channel -- int:bool ]
     cacheByAccount @ account @ array_getitem ?dup not if 0 exit then
     cacheByChannel @ channel @ array_getitem ?dup not if pop 0 exit then
     array_intersect array_count
 ; PUBLIC accountUsingChannel?
-
+ 
   (Returns a list of players on the given channel.)
 : playersOnChannel[ str:channel -- list:players ]
     { }list
@@ -233,7 +233,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         1 array_nunion
     then
 ; PUBLIC playersOnChannel
-
+ 
   (Returns a list of accounts on the given channel.)
 : accountsOnChannel[ str:channel -- list:accounts ]
     { }list
@@ -246,7 +246,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         1 array_nunion
     then
 ; PUBLIC accountsOnChannel
-
+ 
   (Returns a list of every player connected)
 : playersOnWeb[ -- list:players ]
     { }list
@@ -254,44 +254,44 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         dbref dup player? if swap array_appenditem else pop then
     repeat
 ; PUBLIC playersOnWeb
-
+ 
 : setConnectionProperty[ descr:who str:property any:data -- ]
     who @ int? property @ string? AND not if "setConnectionProperty: Invalid arguments" abort then
     connections @ who @ array_getitem ?dup not if exit then
     dup "properties" array_getitem data @ swap property @ array_setitem
     swap "properties" array_setitem connections @ who @ array_setitem connections !
 ; PUBLIC setConnectionProperty
-
+ 
 : getConnectionProperty[ descr:who str:property -- any:data ]
     who @ int? property @ string? AND not if "getConnectionProperty: Invalid arguments" abort then
     connections @ who @ array_getitem ?dup not if 0 exit then
     "properties" array_getitem property @ array_getitem
 ; PUBLIC getConnectionProperty
-
+ 
 : delConnectionProperty[ descr:who str:property -- ]
     who @ int? property @ string? AND not if "delConnectionProperty: Invalid arguments" abort then
     connections @ who @ array_getitem ?dup not if exit then
     dup "properties" array_getitem property @ array_delitem
     swap "properties" array_setitem connections @ who @ array_setitem connections !
 ; PUBLIC delConnectionProperty
-
+ 
 : dispatchStringToDescrs[ arr:descrs str:string -- ]
-    string @ ensureValidUTF8 string !
+    string @ ensureValidUTF8WithEncodedEscapeCharacter string !
     (string @ strlen 65000 > if "Outgoing string is over 65000 characters and too long for the muck." abort then)
     $ifdef trackbandwidth
         descrs @ array_count string @ strlen 2 + * "websocket_out" trackBandwidthCounts
     $endif
     descrs @ string @ webSocketSendTextFrameToDescrs
 ;
-
+ 
 : prepareSystemMessage[ str:message ?:data -- str:encoded ]
     "SYS" message @ strcat "," strcat data @ encodeJson strcat
 ;
-
+ 
 : prepareChannelMessage[ str:channel str:message ?:data -- str:encoded ]
     "MSG" channel @ strcat "," strcat message @ strcat "," strcat data @ encodeJson strcat
 ;
-
+ 
 (Utility to continue a system message through and ensure it's logged)
 : sendSystemMessageToDescrs[ arr:descrs str:message ?:data -- ]
     message @ data @ prepareSystemMessage
@@ -308,7 +308,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
     _stopLogDebugMultiple
     descrs @ swap dispatchStringToDescrs
 ;
-
+ 
 (This is the root function for sending - all sendTo functions break down their requirements to call this one)
 (It assumes argument checking has been performed already)
 : sendChannelMessageToDescrs[ arr:descrs str:channel str:message any:data -- ]
@@ -328,28 +328,28 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
     _stopLogDebugMultiple
     descrs @ swap dispatchStringToDescrs
 ;
-
+ 
 : sendToDescrs[ arr:descrs str:channel str:message any:data -- ]
     descrs @ array? channel @ string? message @ string? AND AND not if "Invalid arguments" abort then
     message @ "" stringcmp not if "Message can't be blank" abort then
     channel @ "" stringcmp not if "Channel can't be blank" abort then
     descrs @ channel @ message @ data @ sendChannelMessageToDescrs
 ; PUBLIC sendToDescrs
-
+ 
 : sendToDescr[ int:who str:channel str:message any:data -- ]
     who @ dup int? AND not if "'Who' must be a non-zero descr." abort then
     channel @ dup string? AND not if "'Channel' must be a non-blank string." abort then
     message @ dup string? AND not if "'Message' must be a non-blank string." abort then
     { who @ }list channel @ message @ data @ sendChannelMessageToDescrs
 ; PUBLIC sendToDescr
-
+ 
 : sendToChannel[ str:channel str:message any:data -- ]
     channel @ string? message @ string? AND not if "Invalid arguments" abort then
     message @ "" stringcmp not if "Message can't be blank" abort then
     channel @ "" stringcmp not if "Channel can't be blank" abort then
     cacheByChannel @ channel @ array_getitem ?dup if channel @ message @ data @ sendChannelMessageToDescrs then
 ; PUBLIC sendToChannel
-
+ 
 : sendToPlayer[ dbref:player str:channel str:message any:data -- ]
     player @ dbref? channel @ string? message @ string? AND AND not if "Invalid arguments" abort then
     player @ ok? not if "Player must be valid" abort then
@@ -362,7 +362,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         channel @ message @ data @ sendChannelMessageToDescrs
     then
 ; PUBLIC sendToPlayer
-
+ 
 : sendToPlayers[ arr:players str:channel str:message any:data -- ]
     players @ array? channel @ string? message @ string? AND AND not if "Invalid arguments" abort then
     message @ "" stringcmp not if "Message can't be blank" abort then
@@ -378,7 +378,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
     repeat
     channel @ message @ data @ sendChannelMessageToDescrs
 ; PUBLIC sendToPlayers
-
+ 
 : sendToAccount[ aid:account str:channel str:message any:data -- ]
     account @ int? channel @ string? message @ string? AND AND not if "Invalid arguments" abort then
     account @ not if "Account can't be blank" abort then
@@ -391,7 +391,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         channel @ message @ data @ sendChannelMessageToDescrs
     then
 ; PUBLIC sendToAccount
-
+ 
 (Separate so that it can be called by internal processes)
 : handleChannelCallbacks[ int:triggeringDescr dbref:triggeringPlayer str:channel str:message any:data -- ]
     _startLogDebug
@@ -436,7 +436,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         then
     repeat
 ;
-
+ 
 : addConnectionToChannel[ descr:who str:channel -- ]
     0 var! announceDescr 0 var! announcePlayer 0 var! announceAccount
     connections @ who @ array_getitem
@@ -446,7 +446,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         _stopLogWarning
         exit
     then
-
+ 
     (Get player / account)
     dup var! connectionDetails
     dup "player" array_getitem ?dup not if #-1 then var! player
@@ -459,7 +459,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         _startLogDebug
             "Descr " who @ intostr strcat " joined channel " strcat channel @ strcat
         _stopLogDebug
-
+ 
         (Check if we need to do announcements about player / account joining channel if they weren't on it previously)
         player @ ok? if
             player @ channel @ playerUsingChannel? not announcePlayer !
@@ -467,7 +467,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         account @ if
             account @ channel @ accountUsingChannel? not announceAccount !
         then
-
+ 
         (Cache - ByChannel - Done last on adding to avoid influencing other checks)
         cacheByChannel @ channel @ array_getitem
         ?dup not if
@@ -487,9 +487,9 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         _startLogDebug
             "Cache - CacheByChannel is now: " cacheByChannel @ anythingToString strcat
         _stopLogDebug
-
+ 
     else pop then
-
+ 
     (Send announcements as required)
     (Do announcements to client first, since otherwise callbacks may cause messages to send out of order)
     { who @ }list "joinedChannel" channel @ sendSystemMessageToDescrs
@@ -513,7 +513,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         who @ player @ channel @ "accountEnteredChannel" account @ handleChannelCallbacks
     then
 ;
-
+ 
 : removeConnectionFromChannel[ str:who str:channel -- ]
     0 var! announceDescr 0 var! announcePlayer 0 var! announceAccount
     connections @ who @ array_getitem
@@ -523,7 +523,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         _stopLogWarning
         exit
     then
-
+ 
     (Get player / account)
     dup var! connectionDetails
     dup "player" array_getitem ?dup not if #-1 then var! player
@@ -536,7 +536,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         _startLogDebug
             "Descr " who @ intostr strcat " left channel " strcat channel @ strcat
         _stopLogDebug
-
+ 
         (Cache - ByChannel - Done first on removing to ensure it influences other checks)
         cacheByChannel @ channel @ array_getitem
         ?dup not if
@@ -563,8 +563,8 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         _startLogDebug
             "Cache - CacheByChannel is now: " cacheByChannel @ anythingToString strcat
         _stopLogDebug
-
-
+ 
+ 
         (Check if we need to do announcements about player / account leaving channel if there's no remaining connections)
         player @ ok? if
             player @ channel @ playerUsingChannel? not announcePlayer !
@@ -573,7 +573,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
             account @ channel @ accountUsingChannel? not announceAccount !
         then
     else pop then
-
+ 
     (Send announcements as required)
     (Do announcements to client first, since otherwise callbacks may cause messages to send out of order)
     (We announce this in case the connection is just leaving/joining channels to change player/account)
@@ -597,20 +597,20 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         who @ player @ channel @ "connectionExitedChannel" who @ handleChannelCallbacks
     then
 ;
-
-
+ 
+ 
 : deleteConnection[ descr:who -- ]
     connections @ who @ array_getitem ?dup if
         var! connectionDetails
         _startLogDebug
             "Deleting descr " who @ intostr strcat ": " strcat connectionDetails @ anythingToString strcat
         _stopLogDebug
-
+ 
         (Remove from channels)
         connectionDetails @ "channels" array_getitem ?dup if
             foreach nip who @ swap removeConnectionFromChannel repeat
         then
-
+ 
         (Cache - ByPlayer - we don't check if it's okay as it might have been deleted)
         connectionDetails @ "player" array_getitem ?dup if
             var! player
@@ -623,7 +623,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
                         "Player's last descr disconnected: " player @ unparseobj strcat
                     _stopLogDebug
                     cacheByPlayer @ player @ int array_delitem cacheByPlayer !
-
+ 
                     _startLogDebug
                     "Doing @player disconnect notification for " player @ unparseobj strcat
                     _stopLogDebug
@@ -638,10 +638,10 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
                 _startLogDebug
                     "Cache - CacheByPlayer is now: " cacheByPlayer @ anythingToString strcat
                 _stopLogDebug
-
+ 
             then
         then
-
+ 
         (Cache - ByAccount - we don't check if it's okay as it might have been deleted)
         connectionDetails @ "account" array_getitem ?dup if
             var! account
@@ -660,7 +660,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
                 _stopLogDebug
             then
         then
-
+ 
         connections @ who @ array_delitem connections !
         (Cleanly disconnect descr, though this will trigger pidwatch for full clearing up.)
         who @ descr? if
@@ -674,7 +674,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
       "Attempt to delete a non-existing descr: " who @ intostr strcat logError
     then
 ;
-
+ 
 : handleAuthentication[ descr:who str:authString -- ]
     authString @ " " split var! page var! token
     _startLogDebug
@@ -692,10 +692,10 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         _startLogDebug
             "Accepted auth token '" token @ strcat "' for descr " strcat descr intostr strcat
         _stopLogDebug
-
+ 
         (Page)
         page @ ?dup if connectionDetails @ "page" array_setitem connectionDetails ! then
-
+ 
         (Account)
         prog "@tokens/" token @ strcat "/account" strcat getprop var! account
         account @ if
@@ -703,7 +703,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
             _startLogDebug
                 "Account for " who @ intostr strcat " set to: " strcat account @ intostr strcat
             _stopLogDebug
-
+ 
             (Cache - ByAccount)
             cacheByAccount @ account @ array_getitem ?dup not if
                 { }list
@@ -724,7 +724,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
                 "Cache - CacheByAccount is now: " cacheByAccount @ anythingToString strcat
             _stopLogDebug
         then
-
+ 
         (Player)
         prog "@tokens/" token @ strcat "/character" strcat getprop dup dbref? not if pop #-1 then var! player
         player @ player? if
@@ -732,14 +732,14 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
             _startLogDebug
                 "Player for " who @ intostr strcat " set to: " strcat player @ unparseobj intostr strcat
             _stopLogDebug
-
+ 
             (Cache - ByPlayer)
             cacheByPlayer @ player @ int array_getitem ?dup not if
                 { }list
                 _startLogDebug
                 "First instance of player " player @ unparseobj intostr strcat " joined, via descr " strcat who @ intostr strcat
                 _stopLogDebug
-
+ 
                 _startLogDebug
                 "Doing @player connect notification for " player @ unparseobj strcat
                 _stopLogDebug
@@ -750,7 +750,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
                     then
                 repeat
             then
-
+ 
             (S: DescrList)
             dup who @ array_findval if
                 _startLogWarning
@@ -763,16 +763,16 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
             _startLogDebug
                 "Cache - CacheByPlayer is now: " cacheByPlayer @ anythingToString strcat
             _stopLogDebug
-
+ 
         then
-
+ 
         (Store)
         connectionDetails @ connections @ who @ array_setitem connections !
-
+ 
         _startLogDebug
             "Completed handshake for descr " who @ intostr strcat " as: " strcat connectionDetails @ anythingToString strcat
         _stopLogDebug
-
+ 
         (Notify connection)
         { who @ }list "accepted " who @ intostr strcat "," strcat player @ intostr strcat "," strcat player @ ok? if player @ name strcat then
         $ifdef trackBandwidth
@@ -782,7 +782,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
             "Informing descr " who @ intostr strcat " of accepted connection" strcat
         _stopLogDebug
         webSocketSendTextFrameToDescrs
-
+ 
         (Remove the used token)
         prog "@tokens/" token @ strcat "/" strcat removepropdir
     else
@@ -795,7 +795,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         { who @ }list "invalidtoken" webSocketSendTextFrameToDescrs
     then
 ;
-
+ 
 : handlePingResponse[ descr:who float:pingResponse -- ]
     connections @ who @ array_getitem
     ?dup if (Occasionally connections witnessed being deleted before a ping response is dealt with)
@@ -805,7 +805,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         connectionDetails @ connections @ who @ array_setitem connections !
     then
 ;
-
+ 
 : handleIncomingSystemMessage[ descr:who str:message str:dataAsJson ] (Descr should already be confirmed to be valid.)
     who @ not message @ not OR if "handleIncomingSystemMessageFrom called with either descr or message blank." logError exit then
     _startLogDebug
@@ -835,7 +835,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         end
     endcase
 ;
-
+ 
 : handleIncomingMessage[ descr:who str:channel str:message str:dataAsJson ] (Descr should already be confirmed to be valid.)
     who @ not channel @ not message @ not OR OR if "handleIncomingMessageFrom called with either descr, channel or message blank." logError exit then
     _startLogDebug
@@ -854,7 +854,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
     else "" then var! data
     who @ connections @ { who @ "player" }list array_nested_get ?dup not if #-1 then channel @ message @ data @ handleChannelCallbacks
 ;
-
+ 
 : handleIncomingTextFrame[ descr:who str:payload ]
     connections @ who @ array_getitem ?dup if (Because it may have dropped elsewhere)
         var! connectionDetails
@@ -893,7 +893,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         _stopLogWarning
     then
 ;
-
+ 
 : attemptToProcessWebsocketMessage[ descr:who array:buffer -- bufferRemaining ]
     buffer @ array_count var! startingBufferLength
     buffer @ websocketGetFrameFromIncomingBuffer (Returns opCode payLoad remainingBuffer)
@@ -944,7 +944,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
     (In case there were multiple, we need to try to process another)
     buffer @ dup if who @ swap attemptToProcessWebsocketMessage then
 ;
-
+ 
 : clientProcess[ descr:who -- ]
     _startLogDebug
         "Starting client process for " who @ intostr strcat
@@ -986,7 +986,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         "Ending client process for " who @ intostr strcat
     _stopLogDebug
 ;
-
+ 
 : handleClientConnecting
  descr descr? not if exit then (Connections can be dropped immediately)
  prog "disabled" getpropstr "Y" instring if
@@ -996,7 +996,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
  then
  systime var! connectedAt
  event_wait pop var! rawWebData
-
+ 
  (Ensure correct protocol version)
  rawWebData @ { "data" "CGIdata" "protocolVersion" 0 }list array_nested_get ?dup not if "" then
  protocolVersion stringcmp if
@@ -1007,12 +1007,12 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
   descr "\r\n" descrnotify (This should only send one \r\n)
   exit
  then
-
+ 
  (At this point we're definitely trying to accept a websocket)
  _startLogDebug
   "New connection from descr " descr intostr strcat
  _stopLogDebug
-
+ 
  rawWebData @ { "data" "HeaderData" "Sec-WebSocket-Key" }list array_nested_get ?dup not if
   _startLogWarning
    "Rejected new WebSocket connection from descr " descr intostr strcat " due to it missing the websocket key header. " strcat
@@ -1034,13 +1034,13 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
  $endif
  descr swap descrnotify
  descr "\r\n" descrnotify (Since descrnotify trims excess \r\n's this will only output one)
-
+ 
     { descr }list "welcome"
  $ifdef trackBandwidth
   dup strlen 2 + (For \r\n) "websocket_out" trackBandwidthCounts
  $endif
     webSocketSendTextFrameToDescrs
-
+ 
  {
   "descr" descr
   "pid" pid
@@ -1052,14 +1052,14 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         dup arrayDump
     $endif
     connections @ descr array_setitem connections !
-
+ 
     descr clientProcess
-
+ 
  _startLogDebug
   "Client connection on " descr intostr strcat " ran for " strcat systime connectedAt @ - intostr strcat "s." strcat
  _stopLogDebug
 ;
-
+ 
 : serverDaemon
     var eventArguments
     var eventName
@@ -1166,7 +1166,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         depth ?dup if "Heartbeat's stack had " swap intostr strcat " item(s). Debug_line follows:" strcat logError debug_line_str logError depth popn then
     repeat
 ;
-
+ 
 (Provides a list of channels and some details about them. Also doubles as general status screen.)
 : cmdChannels
     " " .tell
@@ -1199,7 +1199,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         $endif
         .tell
     repeat
-
+ 
     (Total row)
     "^CYAN^----------------------------------------------------------------------" .tell
     "" 24 left "^CYAN^" swap strcat
@@ -1218,10 +1218,10 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         comma dup "." instring not if "  " strcat then "K" strcat 14 right strcat
     $endif
     .tell
-
+ 
     "All - All connections, Ply - Players, Acc - Accounts" .tell
 ;
-
+ 
 (Debug-dumps of either a single descr or every descr a player owns.)
 : cmdDump[ str:target -- ]
    target @ ?dup if
@@ -1248,14 +1248,14 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
       "No target specified. Provide either a descr or a player." .tell
    then
 ;
-
+ 
 (Provides a list of connections and some details about them)
 : cmdConnections ( -- )
     "^CYAN^Websocket Connections" .tell
-
+ 
     prog "@lastuptime" getpropval
     "^CYAN^Last started (uptime): ^YELLOW^" "%a, %d %b %Y %H:%M:%S" 3 pick timefmt strcat " (" strcat swap systime swap - timeSpanAsString strip strcat ")" strcat .tell
-
+ 
     "^WHITE^Descr  Player             Time PID         Ping Chn Page" .tell
     connections @ ?dup if
         foreach (S: session info)
@@ -1278,7 +1278,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         "^BLUE^No connections at present." .tell
     then
 ;
-
+ 
 : cmdConfig
    var channel
    "^CYAN^Websocket Channel Configurations" .tell
@@ -1292,7 +1292,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
       else "^BLUE^None!" .tell then
    repeat
 ;
-
+ 
 : main
     ensureInit
     command @ "Queued event." stringcmp not if (Queued startup)
@@ -1305,15 +1305,15 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
     then
     (Is this a connection?)
     command @ "(WWW)" stringcmp not if pop handleClientConnecting exit then
-
+ 
     me @ mlevel 5 > not if "Wiz-only command." .tell exit then
-
+ 
     dup "#channel" instring 1 = over "#status" instring 1 = OR if pop cmdChannels exit then
     dup "#dump" instring 1 = if 5 strcut nip strip cmdDump exit then
     dup "#who" instring 1 = if 4 strcut nip strip cmdConnections exit then
     dup "#sessions" instring 1 = if 9 strcut nip strip cmdConnections exit then
     dup "#config" instring 1 = if pop cmdConfig exit then
-
+ 
     dup "#reset" stringcmp not if
         "[!] Reset triggered: " me @ unparseobj strcat logNotice
         (Need to kill old PIDs)
@@ -1322,14 +1322,14 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         "Server reset.." .tell
         exit
     then
-
+ 
     dup "#kill" instring 1 = if
         "[!] Kill signal received." logNotice
         "Service will shut down. This command is largely just here for testing - the system will start up again if something requests it." .tell
         0 serverProcess !
         exit
     then
-
+ 
     dup "#debug" instring 1 = if
   6 strcut nip strip
   dup "" stringcmp not if
@@ -1350,7 +1350,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
   then
   exit
  then
-
+ 
    dup "#addChannel" instring 1 = if
       11 strcut nip strip
       "=" explode_array
@@ -1363,7 +1363,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
       "Added the program '" swap .color-unparseobj strcat "' to receive messages on channel '" strcat swap strcat "'." strcat .tell
       exit
    then
-
+ 
    dup "#rmmChannel" instring 1 = if
       11 strcut nip strip
       "=" explode_array
@@ -1377,8 +1377,8 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
       "Removed the program '" swap .color-unparseobj strcat "' from the channel '" strcat swap strcat "'." strcat .tell
       exit
    then
-
-
+ 
+ 
     dup "#help" instring 1 = over "" stringcmp not OR if pop
         "^WHITE^MuckWebInterface Websockets v" version strcat .tell
         "Detailed information on the program is contained with the comments." .tell
@@ -1395,7 +1395,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         "  #rmmchannel <channel>=<program>" .tell
         exit
     then
-
+ 
     "Didn't recognize that option, use #help to get a list of available commands." .tell
 ;
 .
