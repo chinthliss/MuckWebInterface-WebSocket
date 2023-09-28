@@ -160,6 +160,20 @@ export const handleConnectionSuccess = () => {
 }
 
 /**
+ * Attempts to parse the given JSON
+ */
+const tryToParseJson = (json: string | null): any => {
+    if (!json) return null;
+    let parsedJson = null;
+    try {
+        parsedJson = JSON.parse(json);
+    } catch {
+        logError("Couldn't parse the following JSON: " + json);
+    }
+    return parsedJson;
+}
+
+/**
  * Used by the present connection to pass back a raw string for processing
  */
 export const receivedStringFromConnection = (stringReceived: string): void => {
@@ -168,7 +182,7 @@ export const receivedStringFromConnection = (stringReceived: string): void => {
         try {
             let dataAsJson: string | null;
             [, channel, message, dataAsJson] = stringReceived.match(msgRegExp) || [null, '', '', null];
-            data = (dataAsJson ? JSON.parse(<string>dataAsJson) : null);
+            data = tryToParseJson(dataAsJson);
         } catch (e) {
             logError("Failed to parse string as incoming channel message: " + stringReceived);
             console.log(e);
@@ -187,7 +201,7 @@ export const receivedStringFromConnection = (stringReceived: string): void => {
         try {
             let dataAsJson: string | null;
             [, message, dataAsJson] = stringReceived.match(sysRegExp) || [null, '', null];
-            data = (dataAsJson ? JSON.parse(<string>dataAsJson) : null);
+            data = tryToParseJson(dataAsJson);
         } catch (e) {
             logError("Failed to parse string as incoming system message: " + stringReceived);
             return;
