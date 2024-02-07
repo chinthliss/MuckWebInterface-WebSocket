@@ -35,7 +35,7 @@ Properties on program:
     @player/<some sort of reference>:<program> - Programs to receive wsConnect/wsDisconnect events based on player connection/disconnects
     disabled:If Y the system will prevent any connections
 )
-$version 1.1
+$def _version "1.2.1"
  
 $include $lib/kta/strings
 $include $lib/kta/misc
@@ -65,6 +65,7 @@ $libdef sendToChannel
 $libdef sendToPlayer
 $libdef sendToPlayers
 $libdef sendToAccount
+$libdef sendNotificationToDescr
  
 $def allowCrossDomain 1        (Whether to allow cross-domain connections. This should only really be on during testing/development.)
 $def heartbeatTime 2           (How frequently the heartbeat event triggers)
@@ -391,7 +392,14 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
         channel @ message @ data @ sendChannelMessageToDescrs
     then
 ; PUBLIC sendToAccount
- 
+
+( Sends a non-channel specific notification to a connection, for things like error messages )
+: sendNotificationToDescr[ int:who str:message -- ]
+    who @ dup int? AND not if "'Who' must be a non-zero descr." abort then
+    message @ "" stringcmp not if "Message can't be blank" abort then
+    { who @ }list "notice" message @ sendSystemMessageToDescrs    
+; PUBLIC sendNotificationToDescr
+
 (Separate so that it can be called by internal processes)
 : handleChannelCallbacks[ int:triggeringDescr dbref:triggeringPlayer str:channel str:message any:data -- ]
     _startLogDebug
@@ -1254,14 +1262,14 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
     "^CYAN^Websocket Connections" .tell
  
     prog "@lastuptime" getpropval
-    "^CYAN^Last started (uptime): ^YELLOW^" "%a, %d %b %Y %H:%M:%S" 3 pick timefmt strcat " (" strcat swap systime swap - timeSpanAsString strip strcat ")" strcat .tell
+    "^CYAN^Last started (uptime): ^YELLOW^" "%a, %d %b %Y %H:%M:%S" 3 pick timefmt strcat " (" strcat swap systime swap - timeSpanToString strip strcat " ago)" strcat .tell
  
     "^WHITE^Descr  Player             Time PID         Ping Chn Page" .tell
     connections @ ?dup if
         foreach (S: session info)
             over intostr 6 right " " strcat
             over "player" array_getitem dup ok? if name "^GREEN^" swap else pop "<Unset>" "^BROWN^" swap then 16 left strcat strcat " ^CYAN^" strcat
-            over "connectedAt" array_getitem dup int? not if pop systime then systime swap - timeSpanAsString strcat " ^WHITE^" strcat
+            over "connectedAt" array_getitem dup int? not if pop systime then systime swap - timeSpanToSixCharacters strcat " ^WHITE^" strcat
             over "pid" array_getitem intostr 8 left strcat " " strcat
             over "ping" array_getitem ?dup if 1000.0 * int intostr "ms" strcat else "-" then 7 right strcat " " strcat
             over "channels" array_getitem array_count intostr 3 right strcat " " strcat
@@ -1380,7 +1388,7 @@ svar debugLevel (Loaded from disk on initialization but otherwise in memory to s
  
  
     dup "#help" instring 1 = over "" stringcmp not OR if pop
-        "^WHITE^MuckWebInterface Websockets v" version strcat .tell
+        "^WHITE^MuckWebInterface Websockets v" _version strcat .tell
         "Detailed information on the program is contained with the comments." .tell
         "Commands available:" .tell
         "  #who           -- List of present connections." .tell
