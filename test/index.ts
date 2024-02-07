@@ -30,6 +30,14 @@ describe("Core", () => {
         expect(() => websocket.onError(() => {
         })).to.not.throw();
     });
+
+    test('Allows registering a system notification callback', () => {
+        expect(websocket).to.haveOwnProperty('onSystemNotification');
+        expect(websocket.onSystemNotification).to.be.a('function');
+        expect(() => websocket.onSystemNotification(() => {
+        })).to.not.throw();
+    });
+
 });
 
 describe("Connection Status", () => {

@@ -5,6 +5,7 @@ import {
     setDebug,
     onPlayerChanged,
     onError,
+    onSystemNotification,
     onConnectionStateChanged,
     getPlayerDbref,
     getPlayerName,
@@ -19,6 +20,7 @@ export default {
     setDebug: setDebug,
     onPlayerChanged: onPlayerChanged,
     onError: onError,
+    onSystemNotification: onSystemNotification,
     onConnectionStateChanged: onConnectionStateChanged,
     getPlayerDbref: getPlayerDbref,
     getPlayerName: getPlayerName,
@@ -31,6 +33,7 @@ export default {
 import {
     ConnectionState,
     ConnectionErrorCallback,
+    SystemNotificationCallback,
     ChannelMessageCallback,
     ChannelMonitorCallback,
     ConnectionStateChangedCallback,
@@ -43,6 +46,7 @@ export {
 };
 export type {
     ConnectionErrorCallback,
+    SystemNotificationCallback,
     ChannelMessageCallback,
     ChannelMonitorCallback,
     ConnectionStateChangedCallback,

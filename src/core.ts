@@ -9,7 +9,8 @@ import {
     ConnectionState,
     ConnectionStateChangedCallback,
     ConnectionOptions,
-    PlayerChangedCallback
+    PlayerChangedCallback,
+    SystemNotificationCallback
 } from "./defs";
 
 /**
@@ -62,6 +63,7 @@ let connectionStateChangedCallbacks: ConnectionStateChangedCallback[] = [];
  */
 let connectionErrorCallbacks: ConnectionErrorCallback[] = [];
 
+let systemNotificationCallbacks: SystemNotificationCallback[] = [];
 /**
  * Timeout mostly used to ensure we don't have multiple connection attempts
  */
@@ -246,6 +248,14 @@ const receivedSystemMessage = (message: string, data: any): void => {
             if (data in channels) channels[data].channelConnected();
             else logError("Muck acknowledged joining a channel we weren't aware of! Channel: " + data);
             break;
+        case 'notice':
+            for (let i = 0, maxi = systemNotificationCallbacks.length; i < maxi; i++) {
+                try {
+                    systemNotificationCallbacks[i](data);
+                } catch (e) {
+                }
+            }
+            break;
         case 'test':
             logDebug("Mwi-Websocket Test message received. Data=" + data);
             break;
@@ -370,15 +380,22 @@ export const channel = (channelName: string): ChannelInterface => {
  * Register a callback to be notified when the active player changes
  * Will be called with (playerDbref, playerName).
  */
-export const onPlayerChanged = (callback: PlayerChangedCallback) => {
+export const onPlayerChanged = (callback: PlayerChangedCallback): void => {
     playerChangedCallbacks.push(callback);
 }
 
 /**
  * Register a callback to be notified when there's an error
  */
-export const onError = (callback: ConnectionErrorCallback) => {
+export const onError = (callback: ConnectionErrorCallback): void => {
     connectionErrorCallbacks.push(callback);
+}
+
+/**
+ * Register a callback to be notified when there's a system notification
+ */
+export const onSystemNotification = (callback: SystemNotificationCallback): void => {
+    systemNotificationCallbacks.push(callback);
 }
 
 /**

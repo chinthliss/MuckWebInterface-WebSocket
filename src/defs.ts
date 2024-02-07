@@ -31,6 +31,11 @@ export type ConnectionErrorCallback = (
     (error: string) => void
 )
 
+export type SystemNotificationCallback = (
+    (error: string) => void
+)
+
+
 export type PlayerChangedCallback = (
     (playerDbref: number | null, playerName: string | null) => void
 )

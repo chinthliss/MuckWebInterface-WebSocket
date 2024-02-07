@@ -1,6 +1,6 @@
 {
   "name": "muckwebinterface-websocket",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Encapsulates the functionality for a JS client to communicate to a MUCK over a WebSocket.",
   "author": "Chinthliss",
   "license": "ISC",
