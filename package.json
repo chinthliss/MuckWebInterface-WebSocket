@@ -1,12 +1,13 @@
 {
   "name": "muckwebinterface-websocket",
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Encapsulates the functionality for a JS client to communicate to a MUCK over a WebSocket.",
   "author": "Chinthliss",
   "license": "ISC",
   "type": "module",
   "main": "dist/muckwebinterface-websocket.umd.cjs",
   "module": "dist/muckwebinterface-websocket.js",
+  "sideEffects": false,
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
@@ -22,12 +23,12 @@
     "prepare": "vite build"
   },
   "devDependencies": {
-    "typescript": "^5.1.6",
-    "vite": "^5.0.0",
-    "vite-plugin-dts": "^3.5.1",
-    "vitest": "^1.0.0"
+    "typescript": "^5.4.3",
+    "vite": "^5.2.6",
+    "vite-plugin-dts": "^3.8.1",
+    "vitest": "^1.4.0"
   },
   "dependencies": {
-    "axios": "^1.0.0"
+    "axios": "^1.6.8"
   }
 }
