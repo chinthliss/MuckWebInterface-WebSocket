@@ -244,18 +244,9 @@ export default class ConnectionWebSocket extends Connection {
             logError("Websocket had to abort sending a string because it's over 30,000 characters.");
             return;
         }
-        // Attempt to try to replace certain unicode special characters with ANSI ones.
-        stringToSend = stringToSend
-            .replace(/[\u2018\u2019\u201A]/g, "'")
-            .replace(/[\u201C\u201D\u201E]/g, '"')
-            .replace(/\u2026/g, "...")
-            .replace(/[\u2013\u2014]/g, "-")
-            .replace(/\u02C6/g, "^")
-            .replace(/\u2039/g, "<")
-            .replace(/\u203A/g, ">")
-            .replace(/[\u02DC\u00A0]/g, " ")
-            // And one more to limit the character set
-            .replace(/[^\x20-\x7E\x0A]/g, "")
+
+        // Limit characters being sent to a limited ANSI subset.
+        stringToSend = stringToSend.replace(/[^\x20-\x7E\x0A]/g, "")
 
         // Buffer the string if we're still connecting
         if (!this.handshakeReceivedWelcome || !this.handshakeCompleted) {

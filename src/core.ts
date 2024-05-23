@@ -225,7 +225,7 @@ export const sendChannelMessage = (channel: string, message: string, data: any):
         return;
     }
     if (debug) console.log("[ >> " + channel + "." + message + "] ", data);
-    let parsedData: string = (typeof data !== 'undefined' ? JSON.stringify(data) : '');
+    let parsedData: string = connection.encodeDataForConnection(data);
     let parsedMessage: string = ["MSG", channel, ',', message, ',', parsedData].join('');
     connection.sendString(parsedMessage);
 }
@@ -236,7 +236,7 @@ const sendSystemMessage = (message: string, data: any): void => {
         return;
     }
     if (debug) console.log("[ >> " + message + "] ", data);
-    let parsedData: string = (typeof data !== 'undefined' ? JSON.stringify(data) : '');
+    let parsedData: string = connection.encodeDataForConnection(data);
     let parsedMessage: string = ["SYS", message, ',', parsedData].join('');
     connection.sendString(parsedMessage);
 }
