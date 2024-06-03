@@ -1,6 +1,7 @@
 import {expect, test, vi, describe, afterEach} from 'vitest';
 
 import websocket, {ConnectionState} from '../src/index.js';
+import ConnectionFaker from "../src/connection-faker";
 
 vi.useFakeTimers();
 
@@ -36,6 +37,25 @@ describe("Core", () => {
         expect(websocket.onSystemNotification).to.be.a('function');
         expect(() => websocket.onSystemNotification(() => {
         })).to.not.throw();
+    });
+
+});
+
+describe("Data Encoding", () => {
+    test('Non-ANSI single quotes get converted', () => {
+        let originalValue = '\u2018\u2019\u201A';
+        let json  = new ConnectionFaker().encodeDataForConnection(originalValue);
+        expect(json).to.equal("\"'''\"");
+        expect(JSON.parse(json)).toBeTypeOf('string');
+    });
+
+    describe("Data Encoding", () => {
+        test('Non-ANSI double quotes get converted', () => {
+            let originalValue = '\u201C\u201D\u201E';
+            let json  = new ConnectionFaker().encodeDataForConnection(originalValue);
+            expect(json).to.equal('"\\"\\"\\""');
+            expect(JSON.parse(json)).toBeTypeOf('string');
+        });
     });
 
 });
