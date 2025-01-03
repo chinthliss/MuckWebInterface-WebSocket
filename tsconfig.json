@@ -11,6 +11,8 @@
     // "skipLibCheck": true,
     "noEmit": true,
     "esModuleInterop": true,
+    "composite": true,
+    "declarationMap": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
